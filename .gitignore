@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Environment variables with secrets
+.env.local
+.env.*.local
+
+# Build output
+dist/
+build/
+
+# Logs
+*.log
+
+# Firebase
+.firebase/
+*-debug.log
+
+# Editor directories and files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+
+# Operating System
+Thumbs.db
+*.cache
+
+# Testing
+coverage/
+
+# Misc
+*.tsbuildinfo
+.eslintcache
+
