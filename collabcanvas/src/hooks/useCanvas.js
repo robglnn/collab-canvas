@@ -21,6 +21,7 @@ export function useCanvas() {
   
   const [selectedShapeId, setSelectedShapeId] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
+  const [ownerId, setOwnerId] = useState(null);
 
   // Use Firestore shapes as source of truth
   const shapes = firestoreShapes;
@@ -37,14 +38,17 @@ export function useCanvas() {
           // No owner yet - this user becomes owner
           await setCanvasOwner(user.uid);
           setIsOwner(true);
+          setOwnerId(user.uid);
           console.log('User is now canvas owner');
         } else if (currentOwner === user.uid) {
           // User is the owner
           setIsOwner(true);
+          setOwnerId(currentOwner);
           console.log('User is canvas owner');
         } else {
           // User is a collaborator
           setIsOwner(false);
+          setOwnerId(currentOwner);
           console.log('User is collaborator');
         }
       } catch (error) {
@@ -167,6 +171,7 @@ export function useCanvas() {
     shapes,
     selectedShapeId,
     isOwner,
+    ownerId,
     loading,
     addShape,
     updateShape,

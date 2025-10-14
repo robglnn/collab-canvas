@@ -37,6 +37,7 @@ export default function Canvas() {
     shapes,
     selectedShapeId,
     isOwner,
+    ownerId,
     loading,
     addShape,
     updateShape,
