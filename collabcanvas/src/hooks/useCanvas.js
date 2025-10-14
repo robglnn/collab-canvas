@@ -1,55 +1,139 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useFirestore } from './useFirestore';
+import { useAuth } from './useAuth';
+import {
+  addShape as addShapeToFirestore,
+  updateShape as updateShapeInFirestore,
+  deleteShape as deleteShapeFromFirestore,
+  setCanvasOwner,
+  getCanvasOwner,
+} from '../lib/firestoreService';
 
 /**
- * Custom hook to manage canvas state (shapes, selection, etc.)
- * Local state only - no Firestore integration yet (that comes in PR #5)
+ * Custom hook to manage canvas state with Firestore integration
+ * Handles optimistic updates with rollback on errors
  * 
  * @returns {Object} Canvas state and methods
  */
 export function useCanvas() {
-  const [shapes, setShapes] = useState([]);
+  const { user } = useAuth();
+  const { shapes: firestoreShapes, canvasMetadata, loading } = useFirestore();
+  
   const [selectedShapeId, setSelectedShapeId] = useState(null);
+  const [isOwner, setIsOwner] = useState(false);
+
+  // Use Firestore shapes as source of truth
+  const shapes = firestoreShapes;
+
+  // Set up canvas owner logic
+  useEffect(() => {
+    if (!user) return;
+
+    const initializeOwner = async () => {
+      try {
+        const currentOwner = await getCanvasOwner();
+        
+        if (!currentOwner) {
+          // No owner yet - this user becomes owner
+          await setCanvasOwner(user.uid);
+          setIsOwner(true);
+          console.log('User is now canvas owner');
+        } else if (currentOwner === user.uid) {
+          // User is the owner
+          setIsOwner(true);
+          console.log('User is canvas owner');
+        } else {
+          // User is a collaborator
+          setIsOwner(false);
+          console.log('User is collaborator');
+        }
+      } catch (error) {
+        console.error('Error initializing owner:', error);
+      }
+    };
+
+    initializeOwner();
+  }, [user]);
+
+  // Update isOwner when metadata changes
+  useEffect(() => {
+    if (user && canvasMetadata) {
+      setIsOwner(canvasMetadata.ownerId === user.uid);
+    }
+  }, [user, canvasMetadata]);
 
   /**
-   * Add a new shape to the canvas
+   * Add a new shape with optimistic update
    * 
    * @param {Object} shape - Shape object with id, type, x, y, width, height
    */
-  const addShape = useCallback((shape) => {
-    setShapes((prev) => [...prev, shape]);
-    console.log('Shape added:', shape);
-  }, []);
+  const addShape = useCallback(async (shape) => {
+    if (!user) {
+      console.error('User not authenticated');
+      return;
+    }
+
+    try {
+      // Optimistic update happens through Firestore listener
+      await addShapeToFirestore(shape, user.uid);
+    } catch (error) {
+      console.error('Failed to add shape:', error);
+      // Rollback not needed - Firestore never updated
+      alert('Failed to create shape. Please try again.');
+    }
+  }, [user]);
 
   /**
-   * Update an existing shape
+   * Update an existing shape with optimistic update
    * 
    * @param {string} shapeId - ID of shape to update
    * @param {Object} updates - Properties to update
    */
-  const updateShape = useCallback((shapeId, updates) => {
-    setShapes((prev) =>
-      prev.map((shape) =>
-        shape.id === shapeId ? { ...shape, ...updates } : shape
-      )
-    );
-    console.log('Shape updated:', shapeId, updates);
-  }, []);
+  const updateShape = useCallback(async (shapeId, updates) => {
+    if (!user) {
+      console.error('User not authenticated');
+      return;
+    }
+
+    // Store original shape for rollback
+    const originalShape = shapes.find(s => s.id === shapeId);
+    if (!originalShape) return;
+
+    try {
+      // Update happens through Firestore listener (optimistic)
+      await updateShapeInFirestore(shapeId, updates);
+    } catch (error) {
+      console.error('Failed to update shape:', error);
+      // Firestore listener will revert to last known state
+      alert('Failed to update shape. Please try again.');
+    }
+  }, [user, shapes]);
 
   /**
-   * Delete a shape from the canvas
+   * Delete a shape with optimistic update
    * 
    * @param {string} shapeId - ID of shape to delete
    */
-  const deleteShape = useCallback((shapeId) => {
-    setShapes((prev) => prev.filter((shape) => shape.id !== shapeId));
-    
+  const deleteShape = useCallback(async (shapeId) => {
+    if (!user) {
+      console.error('User not authenticated');
+      return;
+    }
+
     // Clear selection if deleted shape was selected
     if (selectedShapeId === shapeId) {
       setSelectedShapeId(null);
     }
-    
-    console.log('Shape deleted:', shapeId);
-  }, [selectedShapeId]);
+
+    try {
+      // Delete happens through Firestore listener (optimistic)
+      await deleteShapeFromFirestore(shapeId);
+    } catch (error) {
+      console.error('Failed to delete shape:', error);
+      // Firestore listener will restore shape if delete failed
+      alert('Failed to delete shape. Please try again.');
+    }
+  }, [user, selectedShapeId]);
 
   /**
    * Select a shape
@@ -82,6 +166,8 @@ export function useCanvas() {
   return {
     shapes,
     selectedShapeId,
+    isOwner,
+    loading,
     addShape,
     updateShape,
     deleteShape,

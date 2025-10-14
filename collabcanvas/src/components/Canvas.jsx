@@ -34,6 +34,8 @@ export default function Canvas() {
   const {
     shapes,
     selectedShapeId,
+    isOwner,
+    loading,
     addShape,
     updateShape,
     deleteShape,
@@ -208,6 +210,19 @@ export default function Canvas() {
     updateShape(updatedShape.id, updatedShape);
   };
 
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="canvas-container">
+        <Toolbar onCreateShape={handleCreateShape} />
+        <div className="canvas-loading">
+          <div className="loading-spinner"></div>
+          <p>Loading canvas...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="canvas-container">
       <Toolbar onCreateShape={handleCreateShape} />
@@ -249,6 +264,7 @@ export default function Canvas() {
           <div>Position: ({Math.round(stagePos.x)}, {Math.round(stagePos.y)})</div>
           <div>Canvas: {CANVAS_WIDTH}x{CANVAS_HEIGHT}px</div>
           <div>Shapes: {shapes.length}</div>
+          <div>Role: {isOwner ? 'Owner' : 'Collaborator'}</div>
           {selectedShapeId && <div>Selected: {selectedShapeId}</div>}
         </div>
       </div>
