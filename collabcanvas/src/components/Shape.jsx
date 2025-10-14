@@ -114,7 +114,7 @@ const Shape = memo(function Shape({
   };
 
   /**
-   * Handle transform end - update shape dimensions
+   * Handle transform end - update shape dimensions and rotation
    */
   const handleTransformEnd = () => {
     if (!canEdit) return;
@@ -122,6 +122,7 @@ const Shape = memo(function Shape({
     const node = shapeRef.current;
     const scaleX = node.scaleX();
     const scaleY = node.scaleY();
+    const rotation = node.rotation();
 
     // Reset scale and update width/height instead
     node.scaleX(1);
@@ -133,6 +134,7 @@ const Shape = memo(function Shape({
       y: node.y(),
       width: Math.max(5, node.width() * scaleX),
       height: Math.max(5, node.height() * scaleY),
+      rotation: rotation, // Add rotation to shape data
     });
   };
 
@@ -161,6 +163,7 @@ const Shape = memo(function Shape({
           y={shape.y}
           width={shape.width}
           height={shape.height}
+          rotation={shape.rotation || 0} // Add rotation support (default 0)
           fill="#000000" // All rectangles are black for MVP
           stroke={strokeColor}
           strokeWidth={strokeWidth}
@@ -221,7 +224,7 @@ const Shape = memo(function Shape({
             'bottom-right',
           ]}
           keepRatio={false} // Allow free-form resizing (any aspect ratio)
-          rotateEnabled={false} // Disable rotation for MVP
+          rotateEnabled={true} // Enable rotation (0-360 degrees)
         />
       )}
     </>

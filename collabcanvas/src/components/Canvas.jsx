@@ -227,6 +227,7 @@ export default function Canvas() {
           y: canvasPos.y,
           width: 100,
           height: 100,
+          rotation: 0, // Initialize rotation at 0 degrees
         };
 
         addShape(newShape);
