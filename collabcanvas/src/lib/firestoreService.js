@@ -246,3 +246,27 @@ export function subscribeToCanvasMetadata(callback) {
   });
 }
 
+// ==================== USER MANAGEMENT ====================
+
+/**
+ * Kick a user from the canvas (owner only)
+ * Sets their presence to offline and marks them as kicked
+ * 
+ * @param {string} userId - User ID to kick
+ * @returns {Promise<void>}
+ */
+export async function kickUser(userId) {
+  try {
+    const presenceRef = doc(db, 'canvases', CANVAS_ID, 'presence', userId);
+    await setDoc(presenceRef, {
+      online: false,
+      kicked: true,
+      kickedAt: serverTimestamp(),
+    }, { merge: true });
+    console.log('User kicked:', userId);
+  } catch (error) {
+    console.error('Error kicking user:', error);
+    throw error;
+  }
+}
+

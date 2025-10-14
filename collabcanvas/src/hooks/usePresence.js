@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import {
   collection,
   doc,
+  getDoc,
   setDoc,
   onSnapshot,
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from './useAuth';
+import { kickUser as kickUserFromFirestore } from '../lib/firestoreService';
 
 const CANVAS_ID = 'main';
 
@@ -22,10 +24,11 @@ const CANVAS_ID = 'main';
  * @returns {boolean} isOwner - Whether current user is the owner
  */
 export function usePresence(canvasOwnerId) {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [users, setUsers] = useState([]);
   const [onlineCount, setOnlineCount] = useState(0);
   const [isOwner, setIsOwner] = useState(false);
+  const [wasKicked, setWasKicked] = useState(false);
 
   // Set current user as online when component mounts
   useEffect(() => {
@@ -35,10 +38,19 @@ export function usePresence(canvasOwnerId) {
       try {
         const presenceRef = doc(db, 'canvases', CANVAS_ID, 'presence', user.uid);
         
+        // Check if user was kicked before setting online
+        const presenceDoc = await getDoc(presenceRef);
+        if (presenceDoc.exists() && presenceDoc.data().kicked) {
+          console.log('User was kicked, not setting online');
+          setWasKicked(true);
+          return;
+        }
+        
         // Determine user role
         const role = canvasOwnerId === user.uid ? 'owner' : 'collaborator';
         setIsOwner(role === 'owner');
 
+        // Use merge: true to preserve kicked field if it exists
         await setDoc(presenceRef, {
           userId: user.uid,
           userName: user.displayName || 'Anonymous',
@@ -46,8 +58,9 @@ export function usePresence(canvasOwnerId) {
           photoURL: user.photoURL || null,
           role,
           online: true,
+          kicked: false, // Explicitly set kicked to false when user joins
           lastSeen: serverTimestamp(),
-        });
+        }, { merge: true });
 
         console.log('User presence set to online:', user.displayName);
       } catch (error) {
@@ -63,14 +76,9 @@ export function usePresence(canvasOwnerId) {
         try {
           const presenceRef = doc(db, 'canvases', CANVAS_ID, 'presence', user.uid);
           await setDoc(presenceRef, {
-            userId: user.uid,
-            userName: user.displayName || 'Anonymous',
-            userEmail: user.email,
-            photoURL: user.photoURL || null,
-            role: canvasOwnerId === user.uid ? 'owner' : 'collaborator',
             online: false,
             lastSeen: serverTimestamp(),
-          });
+          }, { merge: true });
           console.log('User presence set to offline');
         } catch (error) {
           console.error('Error setting user offline:', error);
@@ -90,14 +98,9 @@ export function usePresence(canvasOwnerId) {
         const presenceRef = doc(db, 'canvases', CANVAS_ID, 'presence', user.uid);
         // Use keepalive to ensure request completes even if page is closing
         await setDoc(presenceRef, {
-          userId: user.uid,
-          userName: user.displayName || 'Anonymous',
-          userEmail: user.email,
-          photoURL: user.photoURL || null,
-          role: canvasOwnerId === user.uid ? 'owner' : 'collaborator',
           online: false,
           lastSeen: serverTimestamp(),
-        });
+        }, { merge: true });
       } catch (error) {
         console.error('Error in beforeunload:', error);
       }
@@ -155,10 +158,65 @@ export function usePresence(canvasOwnerId) {
     };
   }, [user]);
 
+  // Listen to own presence document to detect if kicked
+  useEffect(() => {
+    if (!user) return;
+
+    const myPresenceRef = doc(db, 'canvases', CANVAS_ID, 'presence', user.uid);
+    
+    const unsubscribe = onSnapshot(myPresenceRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        
+        // Check if we've been kicked
+        if (data.kicked && data.online === false) {
+          console.log('User was kicked from canvas');
+          setWasKicked(true);
+          
+          // Sign out after a short delay to show message
+          setTimeout(() => {
+            signOut();
+          }, 3000);
+        }
+      }
+    }, (error) => {
+      console.error('Error listening to own presence:', error);
+    });
+
+    return () => unsubscribe();
+  }, [user, signOut]);
+
+  /**
+   * Kick a user from the canvas (owner only)
+   * 
+   * @param {string} userId - User ID to kick
+   */
+  const kickUser = async (userId) => {
+    if (!isOwner) {
+      console.warn('Only owner can kick users');
+      return;
+    }
+    
+    if (userId === user?.uid) {
+      console.warn('Cannot kick yourself');
+      return;
+    }
+    
+    try {
+      await kickUserFromFirestore(userId);
+      console.log('Successfully kicked user:', userId);
+    } catch (error) {
+      console.error('Failed to kick user:', error);
+      throw error;
+    }
+  };
+
   return {
     users,
     onlineCount,
     isOwner,
+    wasKicked,
+    kickUser,
   };
 }
 

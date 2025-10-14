@@ -28,12 +28,42 @@ function App() {
   }, [user]);
 
   // Use presence hook to track users
-  const { users, onlineCount } = usePresence(ownerId);
+  const { users, onlineCount, isOwner, wasKicked, kickUser } = usePresence(ownerId);
+
+  // Show kicked message if user was removed
+  if (wasKicked) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        flexDirection: 'column',
+        gap: '20px',
+        backgroundColor: '#fee2e2',
+      }}>
+        <div style={{
+          fontSize: '48px',
+        }}>🚫</div>
+        <h2 style={{ margin: 0, color: '#991b1b' }}>You have been removed from the canvas</h2>
+        <p style={{ color: '#7f1d1d' }}>The owner has removed you from this collaboration session.</p>
+        <p style={{ fontSize: '14px', color: '#991b1b' }}>Signing you out...</p>
+      </div>
+    );
+  }
 
   return (
     <Auth>
       <Canvas />
-      {user && <UserList users={users} onlineCount={onlineCount} currentUserId={user.uid} />}
+      {user && (
+        <UserList 
+          users={users} 
+          onlineCount={onlineCount} 
+          currentUserId={user.uid}
+          isOwner={isOwner}
+          onKickUser={kickUser}
+        />
+      )}
     </Auth>
   );
 }

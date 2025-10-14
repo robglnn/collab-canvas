@@ -54,6 +54,7 @@
   border-radius: 8px;
   transition: background 0.2s ease;
   margin-bottom: 8px;
+  position: relative;
 }
 
 .user-item:hover {
@@ -175,12 +176,48 @@
   background: #9ca3af;
 }
 
+/* Remove user button (owner only) */
+.remove-user-btn {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  font-size: 18px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  opacity: 0;
+  margin-left: auto;
+}
+
+.user-item:hover .remove-user-btn {
+  opacity: 1;
+}
+
+.remove-user-btn:hover {
+  background: #fee2e2;
+  color: #ef4444;
+  transform: scale(1.1);
+}
+
+.remove-user-btn:active {
+  transform: scale(0.95);
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .user-list {
     top: 70px;
     right: 10px;
     width: 240px;
+  }
+  
+  .remove-user-btn {
+    opacity: 1; /* Always visible on mobile */
   }
 }
 

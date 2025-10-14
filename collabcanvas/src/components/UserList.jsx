@@ -3,12 +3,15 @@ import './UserList.css';
 /**
  * UserList component - Display online users in sidebar
  * Shows user avatars, names, roles, and online status
+ * Owner can remove collaborators
  * 
  * @param {Array} users - Array of user presence objects
  * @param {number} onlineCount - Count of currently online users
  * @param {string} currentUserId - Current user's ID to highlight them
+ * @param {boolean} isOwner - Whether current user is the owner
+ * @param {Function} onKickUser - Callback to kick a user
  */
-export default function UserList({ users, onlineCount, currentUserId }) {
+export default function UserList({ users, onlineCount, currentUserId, isOwner, onKickUser }) {
   return (
     <div className="user-list">
       <div className="user-list-header">
@@ -52,6 +55,17 @@ export default function UserList({ users, onlineCount, currentUserId }) {
                 {user.role === 'owner' ? '👑 Owner' : 'Collaborator'}
               </div>
             </div>
+
+            {/* Remove button (owner only, not for self or other owner) */}
+            {isOwner && user.userId !== currentUserId && user.role !== 'owner' && (
+              <button
+                className="remove-user-btn"
+                onClick={() => onKickUser(user.userId)}
+                title="Remove user from canvas"
+              >
+                ✕
+              </button>
+            )}
           </div>
         ))}
 
