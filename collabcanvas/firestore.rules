@@ -1,0 +1,39 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Canvas collection rules
+    match /canvases/{canvasId} {
+      // Allow authenticated users to read/write canvas metadata
+      allow read, write: if isAuthenticated();
+      
+      // Canvas objects (shapes)
+      match /objects/{objectId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update, delete: if isAuthenticated();
+      }
+      
+      // User cursors
+      match /cursors/{userId} {
+        allow read: if isAuthenticated();
+        // Users can only write their own cursor
+        allow create, update, delete: if isAuthenticated() && request.auth.uid == userId;
+      }
+      
+      // User presence
+      match /presence/{userId} {
+        allow read: if isAuthenticated();
+        // Users can only write their own presence
+        allow create, update, delete: if isAuthenticated() && request.auth.uid == userId;
+      }
+    }
+  }
+}
+
