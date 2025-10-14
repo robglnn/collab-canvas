@@ -20,7 +20,7 @@ import {
  */
 export function useCanvas() {
   const { user } = useAuth();
-  const { shapes: firestoreShapes, canvasMetadata, loading } = useFirestore();
+  const { shapes: firestoreShapes, canvasMetadata, loading, isConnected, showDisconnectBanner } = useFirestore();
   
   const [selectedShapeId, setSelectedShapeId] = useState(null);
   const [isOwner, setIsOwner] = useState(false);
@@ -238,6 +238,8 @@ export function useCanvas() {
     isOwner,
     ownerId,
     loading,
+    isConnected,
+    showDisconnectBanner,
     addShape,
     updateShape,
     deleteShape,

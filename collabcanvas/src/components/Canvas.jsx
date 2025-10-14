@@ -9,6 +9,7 @@ import Toolbar from './Toolbar';
 import Shape from './Shape';
 import UserCursor from './UserCursor';
 import ContextMenu from './ContextMenu';
+import DisconnectBanner from './DisconnectBanner';
 import './Canvas.css';
 
 /**
@@ -48,6 +49,8 @@ export default function Canvas() {
     isOwner,
     ownerId,
     loading,
+    isConnected,
+    showDisconnectBanner,
     addShape,
     updateShape,
     deleteShape,
@@ -309,6 +312,7 @@ export default function Canvas() {
   return (
     <div className="canvas-container">
       <Toolbar onCreateShape={handleCreateShape} />
+      <DisconnectBanner show={showDisconnectBanner} />
       
       <div className={`canvas-workspace ${placeMode ? 'place-mode' : ''}`}>
         <Stage
