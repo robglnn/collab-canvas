@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { Stage, Layer } from 'react-konva';
+import { Stage, Layer, Rect } from 'react-konva';
 import { useCanvas } from '../hooks/useCanvas';
 import { useCursors } from '../hooks/useCursors';
 import { usePresence } from '../hooks/usePresence';
@@ -25,6 +25,7 @@ import './Canvas.css';
  */
 export default function Canvas() {
   const stageRef = useRef(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   
   // Viewport state (position and scale)
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
@@ -75,6 +76,26 @@ export default function Canvas() {
   const MAX_SCALE = 5;
 
   /**
+   * Initialize canvas position - center the canvas in the viewport
+   */
+  useEffect(() => {
+    if (!stageRef.current || isInitialized) return;
+
+    const stage = stageRef.current;
+    const container = stage.container();
+    const containerWidth = container.offsetWidth;
+    const containerHeight = container.offsetHeight;
+
+    // Calculate position to center the 5000x5000 canvas in viewport
+    const centerX = containerWidth / 2 - CANVAS_WIDTH / 2;
+    const centerY = containerHeight / 2 - CANVAS_HEIGHT / 2;
+
+    setStagePos({ x: centerX, y: centerY });
+    setIsInitialized(true);
+    console.log('Canvas initialized at center:', centerX, centerY);
+  }, [CANVAS_WIDTH, CANVAS_HEIGHT, isInitialized]);
+
+  /**
    * Handle keyboard events (Delete key)
    */
   useEffect(() => {
@@ -113,7 +134,7 @@ export default function Canvas() {
 
   /**
    * Handle mouse wheel for zoom
-   * Smooth, throttled zoom centered on cursor position
+   * Smooth zoom centered on cursor position
    */
   const handleWheel = useCallback((e) => {
     e.evt.preventDefault();
@@ -123,9 +144,15 @@ export default function Canvas() {
 
     const oldScale = stageScale;
     const pointer = stage.getPointerPosition();
+    
+    // Get actual stage position (not state, which may lag)
+    const oldPos = {
+      x: stage.x(),
+      y: stage.y(),
+    };
 
     // Smoother zoom factor (smaller increments = smoother)
-    const scaleBy = 1.05; // Reduced from 1.1 for smoother zoom
+    const scaleBy = 1.05;
     
     // Calculate zoom direction and new scale
     const direction = e.evt.deltaY > 0 ? -1 : 1;
@@ -140,9 +167,10 @@ export default function Canvas() {
     if (clampedScale === oldScale) return;
 
     // Calculate the point on the canvas that the pointer is over
+    // Using ACTUAL stage position from stage.x()/stage.y()
     const mousePointTo = {
-      x: (pointer.x - stagePos.x) / oldScale,
-      y: (pointer.y - stagePos.y) / oldScale,
+      x: (pointer.x - oldPos.x) / oldScale,
+      y: (pointer.y - oldPos.y) / oldScale,
     };
 
     // Calculate new position to keep the mouse point stationary
@@ -154,10 +182,10 @@ export default function Canvas() {
     // Apply position clamping to boundaries
     const clampedPos = clampPosition(newPos, clampedScale);
 
-    // Update both scale and position in single batch
+    // Update both scale and position
     setStageScale(clampedScale);
     setStagePos(clampedPos);
-  }, [stageScale, stagePos, clampPosition]);
+  }, [stageScale, clampPosition]);
 
   /**
    * Handle drag start
@@ -345,6 +373,16 @@ export default function Canvas() {
           className={isDragging ? 'dragging' : ''}
         >
           <Layer>
+            {/* White canvas background - 5000x5000 workspace */}
+            <Rect
+              x={0}
+              y={0}
+              width={CANVAS_WIDTH}
+              height={CANVAS_HEIGHT}
+              fill="#FFFFFF"
+              listening={false}
+            />
+            
             {/* Render all shapes */}
             {shapes.map((shape) => (
               <Shape

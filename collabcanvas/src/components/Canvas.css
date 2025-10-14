@@ -24,9 +24,9 @@
   cursor: grabbing;
 }
 
-/* Konva Stage */
+/* Konva Stage - Gray background (the "void" outside workspace) */
 .konvajs-content {
-  background: white;
+  background: #CBCBCB;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
 }
 
