@@ -39,6 +39,9 @@ export default function Canvas() {
   
   // Context menu state
   const [contextMenu, setContextMenu] = useState(null);
+  
+  // Cursor position on canvas (for debug display)
+  const [cursorCanvasPos, setCursorCanvasPos] = useState({ x: 0, y: 0 });
 
   // Auth hook
   const { user } = useAuth();
@@ -217,7 +220,7 @@ export default function Canvas() {
   };
 
   /**
-   * Handle mouse move - update cursor position in Firestore
+   * Handle mouse move - update cursor position in Firestore and debug display
    */
   const handleMouseMove = (e) => {
     const stage = stageRef.current;
@@ -235,6 +238,9 @@ export default function Canvas() {
     // This accounts for stage pan and zoom to get absolute canvas position
     const canvasX = (pointerPos.x - currentPos.x) / currentScale;
     const canvasY = (pointerPos.y - currentPos.y) / currentScale;
+
+    // Update cursor position for debug display
+    setCursorCanvasPos({ x: Math.round(canvasX), y: Math.round(canvasY) });
 
     // Update cursor position (throttled in useCursors hook)
     updateCursorPosition(canvasX, canvasY);
@@ -432,10 +438,15 @@ export default function Canvas() {
         {/* Debug info */}
         <div className="canvas-debug">
           <div>Zoom: {(stageScale * 100).toFixed(0)}%</div>
-          <div>Position: ({Math.round(stagePos.x)}, {Math.round(stagePos.y)})</div>
+          <div>Canvas Center: ({
+            Math.round((window.innerWidth / 2 - stagePos.x) / stageScale)
+          }, {
+            Math.round((window.innerHeight / 2 - stagePos.y) / stageScale)
+          })</div>
+          <div>Cursor: ({cursorCanvasPos.x}, {cursorCanvasPos.y})</div>
+          <div>Stage Offset: ({Math.round(stagePos.x)}, {Math.round(stagePos.y)})</div>
           <div>Canvas: {CANVAS_WIDTH}x{CANVAS_HEIGHT}px</div>
-          <div>Shapes: {shapes.length}</div>
-          <div>Cursors: {cursors.length}</div>
+          <div>Shapes: {shapes.length} | Cursors: {cursors.length}</div>
           <div>Role: {isOwner ? 'Owner' : 'Collaborator'}</div>
           {selectedShapeId && <div>Selected: {selectedShapeId}</div>}
         </div>
