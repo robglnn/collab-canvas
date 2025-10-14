@@ -1,9 +1,11 @@
 import { useRef, useState, useEffect } from 'react';
 import { Stage, Layer } from 'react-konva';
 import { useCanvas } from '../hooks/useCanvas';
+import { useCursors } from '../hooks/useCursors';
 import { screenToCanvas } from '../lib/canvasUtils';
 import Toolbar from './Toolbar';
 import Shape from './Shape';
+import UserCursor from './UserCursor';
 import './Canvas.css';
 
 /**
@@ -42,6 +44,9 @@ export default function Canvas() {
     selectShape,
     deselectShape,
   } = useCanvas();
+
+  // Cursors hook
+  const { cursors, updateCursorPosition } = useCursors();
 
   // Canvas boundaries
   const CANVAS_WIDTH = 5000;
@@ -153,6 +158,23 @@ export default function Canvas() {
   };
 
   /**
+   * Handle mouse move - update cursor position in Firestore
+   */
+  const handleMouseMove = (e) => {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const pointerPos = stage.getPointerPosition();
+    if (!pointerPos) return;
+
+    // Convert to canvas coordinates
+    const canvasPos = screenToCanvas(pointerPos, stage);
+
+    // Update cursor position (throttled in useCursors hook)
+    updateCursorPosition(canvasPos.x, canvasPos.y);
+  };
+
+  /**
    * Handle stage click - for placing shapes or deselecting
    */
   const handleStageClick = (e) => {
@@ -240,6 +262,7 @@ export default function Canvas() {
           onWheel={handleWheel}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
+          onMouseMove={handleMouseMove}
           onClick={handleStageClick}
           onTap={handleStageClick}
           className={isDragging ? 'dragging' : ''}
@@ -258,12 +281,21 @@ export default function Canvas() {
           </Layer>
         </Stage>
 
+        {/* Render remote cursors */}
+        {cursors.map((cursor) => (
+          <UserCursor
+            key={cursor.userId}
+            cursor={cursor}
+          />
+        ))}
+
         {/* Debug info */}
         <div className="canvas-debug">
           <div>Zoom: {(stageScale * 100).toFixed(0)}%</div>
           <div>Position: ({Math.round(stagePos.x)}, {Math.round(stagePos.y)})</div>
           <div>Canvas: {CANVAS_WIDTH}x{CANVAS_HEIGHT}px</div>
           <div>Shapes: {shapes.length}</div>
+          <div>Cursors: {cursors.length}</div>
           <div>Role: {isOwner ? 'Owner' : 'Collaborator'}</div>
           {selectedShapeId && <div>Selected: {selectedShapeId}</div>}
         </div>
