@@ -5,6 +5,9 @@ import {
   addShape as addShapeToFirestore,
   updateShape as updateShapeInFirestore,
   deleteShape as deleteShapeFromFirestore,
+  lockShape as lockShapeInFirestore,
+  unlockShape as unlockShapeInFirestore,
+  forceOverrideLock as forceOverrideLockInFirestore,
   setCanvasOwner,
   getCanvasOwner,
 } from '../lib/firestoreService';
@@ -167,6 +170,68 @@ export function useCanvas() {
     return shapes.find((shape) => shape.id === shapeId);
   }, [shapes]);
 
+  /**
+   * Lock a shape for editing
+   * 
+   * @param {string} shapeId - Shape ID to lock
+   */
+  const lockShape = useCallback(async (shapeId) => {
+    if (!user) return;
+    
+    try {
+      await lockShapeInFirestore(shapeId, user.uid);
+    } catch (error) {
+      console.error('Error locking shape:', error);
+      alert('Failed to lock shape. Please try again.');
+    }
+  }, [user]);
+
+  /**
+   * Unlock a shape (release lock)
+   * 
+   * @param {string} shapeId - Shape ID to unlock
+   */
+  const unlockShape = useCallback(async (shapeId) => {
+    try {
+      await unlockShapeInFirestore(shapeId);
+    } catch (error) {
+      console.error('Error unlocking shape:', error);
+    }
+  }, []);
+
+  /**
+   * Force override a lock (owner only)
+   * 
+   * @param {string} shapeId - Shape ID to override
+   */
+  const forceOverrideLock = useCallback(async (shapeId) => {
+    if (!user || !isOwner) {
+      console.warn('Only owner can override locks');
+      return;
+    }
+    
+    try {
+      await forceOverrideLockInFirestore(shapeId, user.uid);
+    } catch (error) {
+      console.error('Error overriding lock:', error);
+      alert('Failed to override lock. Please try again.');
+    }
+  }, [user, isOwner]);
+
+  /**
+   * Check if a shape can be edited by current user
+   * 
+   * @param {Object} shape - Shape object
+   * @returns {boolean} True if shape can be edited
+   */
+  const canEditShape = useCallback((shape) => {
+    if (!user) return false;
+    if (!shape.lockedBy) return true; // Not locked
+    if (shape.lockedBy === user.uid) return true; // Locked by current user
+    if (isOwner) return true; // Owner can always edit
+    return false; // Locked by someone else
+  }, [user, isOwner]);
+
   return {
     shapes,
     selectedShapeId,
@@ -179,6 +244,10 @@ export function useCanvas() {
     selectShape,
     deselectShape,
     getShape,
+    lockShape,
+    unlockShape,
+    forceOverrideLock,
+    canEditShape,
   };
 }
 

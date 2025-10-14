@@ -2,10 +2,13 @@ import { useRef, useState, useEffect } from 'react';
 import { Stage, Layer } from 'react-konva';
 import { useCanvas } from '../hooks/useCanvas';
 import { useCursors } from '../hooks/useCursors';
+import { usePresence } from '../hooks/usePresence';
+import { useAuth } from '../hooks/useAuth';
 import { screenToCanvas } from '../lib/canvasUtils';
 import Toolbar from './Toolbar';
 import Shape from './Shape';
 import UserCursor from './UserCursor';
+import ContextMenu from './ContextMenu';
 import './Canvas.css';
 
 /**
@@ -31,6 +34,12 @@ export default function Canvas() {
   
   // Place mode state
   const [placeMode, setPlaceMode] = useState(null); // null or 'rectangle'
+  
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState(null);
+
+  // Auth hook
+  const { user } = useAuth();
 
   // Canvas state hook
   const {
@@ -44,10 +53,17 @@ export default function Canvas() {
     deleteShape,
     selectShape,
     deselectShape,
+    lockShape,
+    unlockShape,
+    forceOverrideLock,
+    canEditShape,
   } = useCanvas();
 
   // Cursors hook
   const { cursors, updateCursorPosition } = useCursors();
+  
+  // Presence hook - to get user names for lock labels
+  const { users } = usePresence(ownerId);
 
   // Canvas boundaries
   const CANVAS_WIDTH = 5000;
@@ -182,6 +198,11 @@ export default function Canvas() {
    * Handle stage click - for placing shapes or deselecting
    */
   const handleStageClick = (e) => {
+    // Close context menu if open
+    if (contextMenu) {
+      setContextMenu(null);
+    }
+
     // If clicked on empty canvas (not a shape)
     const clickedOnEmpty = e.target === stageRef.current;
 
@@ -209,7 +230,13 @@ export default function Canvas() {
           window.exitPlaceMode();
         }
       } else {
-        // Deselect any selected shape
+        // Deselect any selected shape and unlock it
+        if (selectedShapeId) {
+          const selectedShape = shapes.find(s => s.id === selectedShapeId);
+          if (selectedShape && selectedShape.lockedBy === user?.uid) {
+            unlockShape(selectedShapeId);
+          }
+        }
         deselectShape();
       }
     }
@@ -234,6 +261,32 @@ export default function Canvas() {
    */
   const handleShapeChange = (updatedShape) => {
     updateShape(updatedShape.id, updatedShape);
+  };
+
+  /**
+   * Handle shape right-click
+   */
+  const handleShapeRightClick = (shape, position) => {
+    setContextMenu({
+      shape,
+      x: position.x,
+      y: position.y,
+    });
+  };
+
+  /**
+   * Handle override control from context menu
+   */
+  const handleOverrideControl = (shapeId) => {
+    forceOverrideLock(shapeId);
+  };
+
+  /**
+   * Get user name by user ID
+   */
+  const getUserName = (userId) => {
+    const userPresence = users.find(u => u.userId === userId);
+    return userPresence?.userName || 'Unknown User';
   };
 
   // Show loading state
@@ -278,8 +331,15 @@ export default function Canvas() {
                 key={shape.id}
                 shape={shape}
                 isSelected={shape.id === selectedShapeId}
+                canEdit={canEditShape(shape)}
+                lockedByName={shape.lockedBy ? getUserName(shape.lockedBy) : null}
+                isOwner={isOwner}
+                currentUserId={user?.uid}
                 onSelect={() => handleShapeSelect(shape.id)}
                 onChange={handleShapeChange}
+                onLock={lockShape}
+                onUnlock={unlockShape}
+                onRightClick={handleShapeRightClick}
               />
             ))}
           </Layer>
@@ -317,6 +377,19 @@ export default function Canvas() {
           <div>Role: {isOwner ? 'Owner' : 'Collaborator'}</div>
           {selectedShapeId && <div>Selected: {selectedShapeId}</div>}
         </div>
+
+        {/* Context menu */}
+        {contextMenu && (
+          <ContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            shape={contextMenu.shape}
+            isOwner={isOwner}
+            currentUserId={user?.uid}
+            onOverride={handleOverrideControl}
+            onClose={() => setContextMenu(null)}
+          />
+        )}
       </div>
     </div>
   );

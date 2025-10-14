@@ -82,6 +82,68 @@ export async function deleteShape(shapeId) {
 }
 
 /**
+ * Lock a shape for editing
+ * 
+ * @param {string} shapeId - Shape ID
+ * @param {string} userId - User ID who is locking the shape
+ * @returns {Promise<void>}
+ */
+export async function lockShape(shapeId, userId) {
+  try {
+    const shapeRef = doc(db, 'canvases', CANVAS_ID, 'objects', shapeId);
+    await updateDoc(shapeRef, {
+      lockedBy: userId,
+      updatedAt: serverTimestamp(),
+    });
+    console.log('Shape locked by:', userId, shapeId);
+  } catch (error) {
+    console.error('Error locking shape:', error);
+    throw error;
+  }
+}
+
+/**
+ * Unlock a shape (release lock)
+ * 
+ * @param {string} shapeId - Shape ID
+ * @returns {Promise<void>}
+ */
+export async function unlockShape(shapeId) {
+  try {
+    const shapeRef = doc(db, 'canvases', CANVAS_ID, 'objects', shapeId);
+    await updateDoc(shapeRef, {
+      lockedBy: null,
+      updatedAt: serverTimestamp(),
+    });
+    console.log('Shape unlocked:', shapeId);
+  } catch (error) {
+    console.error('Error unlocking shape:', error);
+    throw error;
+  }
+}
+
+/**
+ * Force override lock on a shape (owner only)
+ * 
+ * @param {string} shapeId - Shape ID
+ * @param {string} ownerId - Owner's user ID
+ * @returns {Promise<void>}
+ */
+export async function forceOverrideLock(shapeId, ownerId) {
+  try {
+    const shapeRef = doc(db, 'canvases', CANVAS_ID, 'objects', shapeId);
+    await updateDoc(shapeRef, {
+      lockedBy: ownerId,
+      updatedAt: serverTimestamp(),
+    });
+    console.log('Shape lock overridden by owner:', shapeId);
+  } catch (error) {
+    console.error('Error overriding shape lock:', error);
+    throw error;
+  }
+}
+
+/**
  * Get all shapes from Firestore
  * 
  * @returns {Promise<Array>} Array of shape objects
