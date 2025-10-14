@@ -13,15 +13,32 @@ A real-time collaborative canvas application built with React, Firebase, and Kon
 - **Backend:** Firebase (Firestore + Authentication + Hosting)
 - **Auth:** Google OAuth via Firebase Authentication
 
-## 📋 Features (MVP)
+## ✨ Features (MVP)
 
-- Real-time collaborative canvas (5000x5000px workspace)
-- Google OAuth authentication
-- Rectangle shape creation and manipulation
-- Multi-user cursor synchronization
-- User presence tracking
-- Owner controls with priority locking
-- Persistent canvas state
+### Core Canvas Features
+- **5000x5000px workspace** with pan (drag) and zoom (scroll wheel)
+- **Rectangle creation** - Click toolbar button, then click canvas to place
+- **Free-form resizing** - 8 handles (4 corners + 4 middles) for any aspect ratio
+- **Shape manipulation** - Drag to move, resize, delete with Delete key
+- **Canvas boundaries** - Prevents panning beyond 5000x5000px limits
+
+### Real-Time Collaboration
+- **Multi-user cursor sync** - See everyone's mouse position with name labels
+- **Instant shape sync** - Changes appear for all users within 100ms
+- **User presence** - See who's online with profile photos and roles
+- **Shape locking** - Auto-locks when editing to prevent conflicts
+
+### Owner Controls
+- **Priority locking** - Owner can always edit any shape
+- **Override control** - Right-click locked shapes to take control
+- **Kick users** - Remove collaborators from canvas (UI present)
+- **Permanent ownership** - First user becomes permanent owner
+
+### Reliability
+- **State persistence** - Canvas survives refresh and disconnects
+- **Optimistic updates** - Immediate UI feedback with rollback on errors
+- **Reconnection handling** - 3-second disconnect banner with refresh prompt
+- **Firestore sync** - All data persisted in real-time database
 
 ## 🏃 Development Setup
 
@@ -89,16 +106,39 @@ src/
 - [Product Requirements Document (PRD)](../PRD.md)
 - [Task Breakdown](../tasks.md)
 
-## 🎯 Current Status
+## 🎯 Project Status
 
-**PR #1: Project Setup & Firebase Configuration** ✅ Complete
+### Completed PRs
 
-- React + Vite initialized
-- Firebase & Konva dependencies installed
-- Firebase project configured
-- Firebase Hosting set up and deployed
-- Firestore security rules deployed
+- ✅ **PR #1-6:** Setup, Auth, Canvas, Shapes, Real-time Sync, Cursor Sync
+- ✅ **PR #7:** User Presence System  
+- ✅ **PR #8:** Shape Locking + Owner Override
+- ✅ **PR #9:** Kick User (partial implementation)
+- ✅ **PR #10:** State Persistence & Reconnection
+- 🚧 **PR #11:** Polish, Performance & Bug Fixes (in progress)
+
+### Upcoming
+- ⏳ **PR #12:** Final Deployment & MVP Testing
 
 ---
 
-Built with ❤️ as a Figma clone MVP
+## 📚 Firestore Structure
+
+```
+/canvases/main/
+├── metadata/           # Canvas owner, created timestamp
+├── objects/{id}/       # Shapes (x, y, width, height, lockedBy, createdBy)
+├── cursors/{userId}/   # Real-time cursor positions (x, y, userName)
+└── presence/{userId}/  # User online status (userName, role, online, kicked)
+```
+
+## 🎨 Color Coding
+
+- **Blue outline:** Selected shape
+- **Green outline:** Locked by you
+- **Red outline:** Locked by another user  
+- **Black:** Unlocked shape
+
+---
+
+Built with ❤️ as a Figma-like collaborative canvas MVP

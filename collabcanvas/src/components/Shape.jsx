@@ -1,9 +1,10 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, memo } from 'react';
 import { Rect, Transformer, Text, Group } from 'react-konva';
 
 /**
  * Shape component - Renders a single shape on the canvas
  * Supports selection, dragging, locking, and visual feedback
+ * Memoized to prevent unnecessary re-renders
  * 
  * @param {Object} shape - Shape data (id, type, x, y, width, height, lockedBy, createdBy)
  * @param {boolean} isSelected - Whether this shape is currently selected
@@ -17,7 +18,7 @@ import { Rect, Transformer, Text, Group } from 'react-konva';
  * @param {Function} onUnlock - Callback to unlock shape
  * @param {Function} onRightClick - Callback for right-click (passes shape and position)
  */
-export default function Shape({ 
+const Shape = memo(function Shape({ 
   shape, 
   isSelected, 
   canEdit, 
@@ -225,5 +226,6 @@ export default function Shape({
       )}
     </>
   );
-}
+});
 
+export default Shape;
