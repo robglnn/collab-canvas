@@ -164,14 +164,17 @@ export default function Canvas() {
     const stage = stageRef.current;
     if (!stage) return;
 
+    // Get pointer position relative to stage container (screen coordinates)
     const pointerPos = stage.getPointerPosition();
     if (!pointerPos) return;
 
-    // Convert to canvas coordinates
-    const canvasPos = screenToCanvas(pointerPos, stage);
+    // Convert screen coordinates to canvas coordinates
+    // This accounts for stage pan and zoom to get absolute canvas position
+    const canvasX = (pointerPos.x - stagePos.x) / stageScale;
+    const canvasY = (pointerPos.y - stagePos.y) / stageScale;
 
     // Update cursor position (throttled in useCursors hook)
-    updateCursorPosition(canvasPos.x, canvasPos.y);
+    updateCursorPosition(canvasX, canvasY);
   };
 
   /**
