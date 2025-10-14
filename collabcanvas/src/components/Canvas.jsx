@@ -1,14 +1,21 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Stage, Layer } from 'react-konva';
+import { useCanvas } from '../hooks/useCanvas';
+import { screenToCanvas } from '../lib/canvasUtils';
+import Toolbar from './Toolbar';
+import Shape from './Shape';
 import './Canvas.css';
 
 /**
  * Main canvas component with Konva.js
- * Handles pan and zoom interactions (local only - no multiplayer yet)
+ * Handles pan, zoom, shape creation, selection, and deletion (local only)
  * 
  * Canvas size: 5000x5000px workspace
  * Pan: Left-click drag on empty canvas
  * Zoom: Mouse scroll wheel
+ * Create: Click toolbar button, then click canvas to place
+ * Select: Click on shape
+ * Delete: Select shape, press Delete key
  */
 export default function Canvas() {
   const stageRef = useRef(null);
@@ -19,12 +26,40 @@ export default function Canvas() {
   
   // Pan state
   const [isDragging, setIsDragging] = useState(false);
+  
+  // Place mode state
+  const [placeMode, setPlaceMode] = useState(null); // null or 'rectangle'
+
+  // Canvas state hook
+  const {
+    shapes,
+    selectedShapeId,
+    addShape,
+    updateShape,
+    deleteShape,
+    selectShape,
+    deselectShape,
+  } = useCanvas();
 
   // Canvas boundaries
   const CANVAS_WIDTH = 5000;
   const CANVAS_HEIGHT = 5000;
   const MIN_SCALE = 0.1;
   const MAX_SCALE = 5;
+
+  /**
+   * Handle keyboard events (Delete key)
+   */
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Delete' && selectedShapeId) {
+        deleteShape(selectedShapeId);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedShapeId, deleteShape]);
 
   /**
    * Clamp viewport position to stay within canvas boundaries
@@ -89,8 +124,11 @@ export default function Canvas() {
   /**
    * Handle drag start
    */
-  const handleDragStart = () => {
-    setIsDragging(true);
+  const handleDragStart = (e) => {
+    // Only allow stage dragging, not shape dragging
+    if (e.target === stageRef.current) {
+      setIsDragging(true);
+    }
   };
 
   /**
@@ -99,45 +137,121 @@ export default function Canvas() {
   const handleDragEnd = (e) => {
     setIsDragging(false);
     
-    const stage = e.target;
-    const newPos = {
-      x: stage.x(),
-      y: stage.y(),
-    };
+    // Only handle stage drag end
+    if (e.target === stageRef.current) {
+      const stage = e.target;
+      const newPos = {
+        x: stage.x(),
+        y: stage.y(),
+      };
 
-    const clampedPos = clampPosition(newPos, stageScale);
-    setStagePos(clampedPos);
+      const clampedPos = clampPosition(newPos, stageScale);
+      setStagePos(clampedPos);
+    }
+  };
+
+  /**
+   * Handle stage click - for placing shapes or deselecting
+   */
+  const handleStageClick = (e) => {
+    // If clicked on empty canvas (not a shape)
+    const clickedOnEmpty = e.target === stageRef.current;
+
+    if (clickedOnEmpty) {
+      if (placeMode === 'rectangle') {
+        // Place a rectangle at click position
+        const stage = stageRef.current;
+        const pointerPos = stage.getPointerPosition();
+        const canvasPos = screenToCanvas(pointerPos, stage);
+
+        const newShape = {
+          id: `shape-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          type: 'rectangle',
+          x: canvasPos.x,
+          y: canvasPos.y,
+          width: 100,
+          height: 100,
+        };
+
+        addShape(newShape);
+        
+        // Auto-exit place mode after placing one shape
+        setPlaceMode(null);
+        if (window.exitPlaceMode) {
+          window.exitPlaceMode();
+        }
+      } else {
+        // Deselect any selected shape
+        deselectShape();
+      }
+    }
+  };
+
+  /**
+   * Handle toolbar create shape request
+   */
+  const handleCreateShape = (shapeType) => {
+    setPlaceMode(shapeType);
+  };
+
+  /**
+   * Handle shape selection
+   */
+  const handleShapeSelect = (shapeId) => {
+    selectShape(shapeId);
+  };
+
+  /**
+   * Handle shape change (move, resize)
+   */
+  const handleShapeChange = (updatedShape) => {
+    updateShape(updatedShape.id, updatedShape);
   };
 
   return (
     <div className="canvas-container">
-      <Stage
-        ref={stageRef}
-        width={window.innerWidth}
-        height={window.innerHeight - 60} // Subtract header height
-        x={stagePos.x}
-        y={stagePos.y}
-        scaleX={stageScale}
-        scaleY={stageScale}
-        draggable={true}
-        onWheel={handleWheel}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        className={isDragging ? 'dragging' : ''}
-      >
-        <Layer>
-          {/* Canvas background - visual indicator of workspace */}
-          {/* Shapes will be added in PR #4 */}
-        </Layer>
-      </Stage>
+      <Toolbar onCreateShape={handleCreateShape} />
+      
+      <div className={`canvas-workspace ${placeMode ? 'place-mode' : ''}`}>
+        <Stage
+          ref={stageRef}
+          width={window.innerWidth - 200} // Subtract toolbar width
+          height={window.innerHeight - 60} // Subtract header height
+          x={stagePos.x}
+          y={stagePos.y}
+          scaleX={stageScale}
+          scaleY={stageScale}
+          draggable={true}
+          onWheel={handleWheel}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onClick={handleStageClick}
+          onTap={handleStageClick}
+          className={isDragging ? 'dragging' : ''}
+        >
+          <Layer>
+            {/* Render all shapes */}
+            {shapes.map((shape) => (
+              <Shape
+                key={shape.id}
+                shape={shape}
+                isSelected={shape.id === selectedShapeId}
+                onSelect={() => handleShapeSelect(shape.id)}
+                onChange={handleShapeChange}
+              />
+            ))}
+          </Layer>
+        </Stage>
 
-      {/* Debug info */}
-      <div className="canvas-debug">
-        <div>Zoom: {(stageScale * 100).toFixed(0)}%</div>
-        <div>Position: ({Math.round(stagePos.x)}, {Math.round(stagePos.y)})</div>
-        <div>Canvas: {CANVAS_WIDTH}x{CANVAS_HEIGHT}px</div>
+        {/* Debug info */}
+        <div className="canvas-debug">
+          <div>Zoom: {(stageScale * 100).toFixed(0)}%</div>
+          <div>Position: ({Math.round(stagePos.x)}, {Math.round(stagePos.y)})</div>
+          <div>Canvas: {CANVAS_WIDTH}x{CANVAS_HEIGHT}px</div>
+          <div>Shapes: {shapes.length}</div>
+          {selectedShapeId && <div>Selected: {selectedShapeId}</div>}
+        </div>
       </div>
     </div>
   );
 }
-

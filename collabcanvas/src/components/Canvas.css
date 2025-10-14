@@ -5,10 +5,22 @@
   height: 100%;
   overflow: hidden;
   background: #f0f0f0;
+  display: flex;
+}
+
+/* Canvas Workspace - Area to the right of toolbar */
+.canvas-workspace {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
   cursor: grab;
 }
 
-.canvas-container .dragging {
+.canvas-workspace.place-mode {
+  cursor: crosshair;
+}
+
+.canvas-workspace .dragging {
   cursor: grabbing;
 }
 
