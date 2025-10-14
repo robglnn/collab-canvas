@@ -1,14 +1,11 @@
 import Auth from './components/Auth';
+import Canvas from './components/Canvas';
 import './App.css';
 
 function App() {
   return (
     <Auth>
-      <div className="placeholder-content">
-        <h1>🎨 CollabCanvas</h1>
-        <p>Authentication successful!</p>
-        <p>Canvas coming in PR #3...</p>
-      </div>
+      <Canvas />
     </Auth>
   );
 }
