@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { Stage, Layer } from 'react-konva';
 import { useCanvas } from '../hooks/useCanvas';
 import { useCursors } from '../hooks/useCursors';
@@ -91,7 +91,7 @@ export default function Canvas() {
   /**
    * Clamp viewport position to stay within canvas boundaries
    */
-  const clampPosition = (pos, scale) => {
+  const clampPosition = useCallback((pos, scale) => {
     const stage = stageRef.current;
     if (!stage) return pos;
 
@@ -109,44 +109,55 @@ export default function Canvas() {
       x: Math.max(minX, Math.min(maxX, pos.x)),
       y: Math.max(minY, Math.min(maxY, pos.y)),
     };
-  };
+  }, [CANVAS_WIDTH, CANVAS_HEIGHT]);
 
   /**
    * Handle mouse wheel for zoom
+   * Smooth, throttled zoom centered on cursor position
    */
-  const handleWheel = (e) => {
+  const handleWheel = useCallback((e) => {
     e.evt.preventDefault();
 
     const stage = stageRef.current;
-    const oldScale = stage.scaleX();
+    if (!stage) return;
+
+    const oldScale = stageScale;
     const pointer = stage.getPointerPosition();
 
-    // Calculate zoom factor
-    const scaleBy = 1.1;
-    const newScale = e.evt.deltaY > 0 
-      ? oldScale / scaleBy 
-      : oldScale * scaleBy;
+    // Smoother zoom factor (smaller increments = smoother)
+    const scaleBy = 1.05; // Reduced from 1.1 for smoother zoom
+    
+    // Calculate zoom direction and new scale
+    const direction = e.evt.deltaY > 0 ? -1 : 1;
+    const newScale = direction > 0 
+      ? oldScale * scaleBy 
+      : oldScale / scaleBy;
 
-    // Clamp scale
+    // Clamp scale to min/max bounds
     const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
+    
+    // If scale didn't change (hit limits), don't update
+    if (clampedScale === oldScale) return;
 
-    // Calculate new position to zoom towards cursor
+    // Calculate the point on the canvas that the pointer is over
     const mousePointTo = {
-      x: (pointer.x - stage.x()) / oldScale,
-      y: (pointer.y - stage.y()) / oldScale,
+      x: (pointer.x - stagePos.x) / oldScale,
+      y: (pointer.y - stagePos.y) / oldScale,
     };
 
+    // Calculate new position to keep the mouse point stationary
     const newPos = {
       x: pointer.x - mousePointTo.x * clampedScale,
       y: pointer.y - mousePointTo.y * clampedScale,
     };
 
-    // Clamp position to boundaries
+    // Apply position clamping to boundaries
     const clampedPos = clampPosition(newPos, clampedScale);
 
+    // Update both scale and position in single batch
     setStageScale(clampedScale);
     setStagePos(clampedPos);
-  };
+  }, [stageScale, stagePos, clampPosition]);
 
   /**
    * Handle drag start
