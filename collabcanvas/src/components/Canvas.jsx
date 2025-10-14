@@ -281,13 +281,27 @@ export default function Canvas() {
           </Layer>
         </Stage>
 
-        {/* Render remote cursors */}
-        {cursors.map((cursor) => (
-          <UserCursor
-            key={cursor.userId}
-            cursor={cursor}
-          />
-        ))}
+        {/* Render remote cursors - convert canvas coords to screen coords */}
+        {cursors.map((cursor) => {
+          const stage = stageRef.current;
+          if (!stage) return null;
+          
+          // Convert canvas coordinates to screen coordinates
+          // Account for current pan (stage position) and zoom (stage scale)
+          const screenX = cursor.x * stageScale + stagePos.x;
+          const screenY = cursor.y * stageScale + stagePos.y;
+          
+          return (
+            <UserCursor
+              key={cursor.userId}
+              cursor={{
+                ...cursor,
+                x: screenX,
+                y: screenY,
+              }}
+            />
+          );
+        })}
 
         {/* Debug info */}
         <div className="canvas-debug">
