@@ -185,10 +185,14 @@ export default function Canvas() {
     const pointerPos = stage.getPointerPosition();
     if (!pointerPos) return;
 
+    // Use LIVE stage values for accurate canvas conversion during interactions
+    const currentPos = stage.position();
+    const currentScale = stage.scaleX();
+
     // Convert screen coordinates to canvas coordinates
     // This accounts for stage pan and zoom to get absolute canvas position
-    const canvasX = (pointerPos.x - stagePos.x) / stageScale;
-    const canvasY = (pointerPos.y - stagePos.y) / stageScale;
+    const canvasX = (pointerPos.x - currentPos.x) / currentScale;
+    const canvasY = (pointerPos.y - currentPos.y) / currentScale;
 
     // Update cursor position (throttled in useCursors hook)
     updateCursorPosition(canvasX, canvasY);
@@ -350,10 +354,14 @@ export default function Canvas() {
           const stage = stageRef.current;
           if (!stage) return null;
           
+          // Use LIVE stage values for accurate screen conversion
+          const currentPos = stage.position();
+          const currentScale = stage.scaleX();
+          
           // Convert canvas coordinates to screen coordinates
           // Account for current pan (stage position) and zoom (stage scale)
-          const screenX = cursor.x * stageScale + stagePos.x;
-          const screenY = cursor.y * stageScale + stagePos.y;
+          const screenX = cursor.x * currentScale + currentPos.x;
+          const screenY = cursor.y * currentScale + currentPos.y;
           
           return (
             <UserCursor
