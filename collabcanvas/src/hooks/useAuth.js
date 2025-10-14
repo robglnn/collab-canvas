@@ -46,11 +46,17 @@ export function useAuth() {
 
   /**
    * Sign in with Google OAuth popup
+   * Force account selection to allow switching users
    */
   const signInWithGoogle = async () => {
     try {
       setLoading(true);
       setError(null);
+      
+      // Set custom parameters to force account selection
+      googleProvider.setCustomParameters({
+        prompt: 'select_account'
+      });
       
       const result = await signInWithPopup(auth, googleProvider);
       
