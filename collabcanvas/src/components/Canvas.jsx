@@ -72,31 +72,79 @@ export default function Canvas() {
   // Presence hook - to get user names for lock labels
   const { users } = usePresence(ownerId);
 
-  // Canvas boundaries
+  // Canvas boundaries and zoom limits
   const CANVAS_WIDTH = 5000;
   const CANVAS_HEIGHT = 5000;
   const MIN_SCALE = 0.1;
   const MAX_SCALE = 5;
+  
+  // Spawn configuration: Where users appear when they first load
+  // 
+  // To change spawn behavior for different canvas sizes:
+  // - For center spawn: CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2
+  // - For top-left: 0, 0
+  // - For custom position: any coordinates within canvas bounds
+  // - Zoom: 1.0 = 100%, 0.5 = 50%, 2.0 = 200%
+  //
+  // Example for 10000x8000 canvas with top-left spawn:
+  //   const CANVAS_WIDTH = 10000;
+  //   const CANVAS_HEIGHT = 8000;
+  //   const SPAWN_CANVAS_X = 0;
+  //   const SPAWN_CANVAS_Y = 0;
+  //   const SPAWN_ZOOM = 0.5; // Zoomed out to see more
+  //
+  const SPAWN_CANVAS_X = CANVAS_WIDTH / 2;  // 2500 for 5000px canvas (center X)
+  const SPAWN_CANVAS_Y = CANVAS_HEIGHT / 2; // 2500 for 5000px canvas (center Y)
+  const SPAWN_ZOOM = 1.0; // 100% zoom
 
   /**
-   * Initialize canvas position - center the canvas in the viewport
+   * Calculate stage position to show a specific canvas point at viewport center
+   * 
+   * @param {number} canvasX - Canvas X coordinate to center on (0-CANVAS_WIDTH)
+   * @param {number} canvasY - Canvas Y coordinate to center on (0-CANVAS_HEIGHT)
+   * @param {number} zoom - Zoom level (1.0 = 100%)
+   * @param {number} viewportWidth - Viewport width in pixels
+   * @param {number} viewportHeight - Viewport height in pixels
+   * @returns {{x: number, y: number}} Stage position
+   */
+  const calculateStagePosition = useCallback((canvasX, canvasY, zoom, viewportWidth, viewportHeight) => {
+    // To show canvas point (canvasX, canvasY) at viewport center:
+    // viewportCenter = stagePos + (canvasPoint * zoom)
+    // Therefore: stagePos = viewportCenter - (canvasPoint * zoom)
+    return {
+      x: viewportWidth / 2 - canvasX * zoom,
+      y: viewportHeight / 2 - canvasY * zoom,
+    };
+  }, []);
+
+  /**
+   * Initialize canvas position - spawn user at center of canvas
+   * Flexible for any canvas size and spawn point
    */
   useEffect(() => {
     if (!stageRef.current || isInitialized) return;
 
     const stage = stageRef.current;
     const container = stage.container();
-    const containerWidth = container.offsetWidth;
-    const containerHeight = container.offsetHeight;
+    const viewportWidth = container.offsetWidth;
+    const viewportHeight = container.offsetHeight;
 
-    // Calculate position to center the 5000x5000 canvas in viewport
-    const centerX = containerWidth / 2 - CANVAS_WIDTH / 2;
-    const centerY = containerHeight / 2 - CANVAS_HEIGHT / 2;
+    // Calculate stage position to show spawn point at viewport center
+    const initialPos = calculateStagePosition(
+      SPAWN_CANVAS_X,
+      SPAWN_CANVAS_Y,
+      SPAWN_ZOOM,
+      viewportWidth,
+      viewportHeight
+    );
 
-    setStagePos({ x: centerX, y: centerY });
+    setStagePos(initialPos);
+    setStageScale(SPAWN_ZOOM);
     setIsInitialized(true);
-    console.log('Canvas initialized at center:', centerX, centerY);
-  }, [CANVAS_WIDTH, CANVAS_HEIGHT, isInitialized]);
+    
+    console.log(`Canvas initialized: User spawned at canvas (${SPAWN_CANVAS_X}, ${SPAWN_CANVAS_Y}) with ${SPAWN_ZOOM * 100}% zoom`);
+    console.log(`Stage position: (${Math.round(initialPos.x)}, ${Math.round(initialPos.y)})`);
+  }, [CANVAS_WIDTH, CANVAS_HEIGHT, SPAWN_CANVAS_X, SPAWN_CANVAS_Y, SPAWN_ZOOM, isInitialized, calculateStagePosition]);
 
   /**
    * Handle keyboard events (Delete key)
