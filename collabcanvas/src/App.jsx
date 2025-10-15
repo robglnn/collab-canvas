@@ -4,6 +4,7 @@ import Canvas from './components/Canvas';
 import UserList from './components/UserList';
 import { useAuth } from './hooks/useAuth';
 import { usePresence } from './hooks/usePresence';
+import { useCursors } from './hooks/useCursors';
 import { getCanvasOwner } from './lib/firestoreService';
 import './App.css';
 
@@ -29,6 +30,16 @@ function App() {
 
   // Use presence hook to track users
   const { users, onlineCount, isOwner, wasKicked, kickUser, setUserOfflineBeforeSignout } = usePresence(ownerId);
+  
+  // Use cursors hook to get removeCursor function for cleanup
+  const onlineUserIds = users.filter(u => u.online).map(u => u.userId);
+  const { removeCursor } = useCursors(onlineUserIds);
+  
+  // Combined cleanup before signout
+  const handleBeforeSignOut = async () => {
+    await setUserOfflineBeforeSignout(); // Set presence offline
+    await removeCursor(); // Remove cursor
+  };
 
   // Show kicked message if user was removed
   if (wasKicked) {
@@ -53,7 +64,7 @@ function App() {
   }
 
   return (
-    <Auth onBeforeSignOut={setUserOfflineBeforeSignout}>
+    <Auth onBeforeSignOut={handleBeforeSignOut}>
       <Canvas />
       {user && (
         <UserList 

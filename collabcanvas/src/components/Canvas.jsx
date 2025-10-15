@@ -66,11 +66,14 @@ export default function Canvas() {
     canEditShape,
   } = useCanvas();
 
-  // Cursors hook
-  const { cursors, updateCursorPosition } = useCursors();
-  
   // Presence hook - to get user names for lock labels
   const { users } = usePresence(ownerId);
+  
+  // Get online user IDs from presence data
+  const onlineUserIds = users.filter(u => u.online).map(u => u.userId);
+  
+  // Cursors hook - pass online user IDs to filter cursors
+  const { cursors, updateCursorPosition, removeCursor } = useCursors(onlineUserIds);
 
   // Canvas boundaries and zoom limits
   const CANVAS_WIDTH = 5000;
