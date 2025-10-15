@@ -8,10 +8,21 @@ service cloud.firestore {
       return request.auth != null;
     }
     
+    // Helper function to check if user is canvas owner
+    function isCanvasOwner(canvasId) {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/canvases/$(canvasId)) &&
+             get(/databases/$(database)/documents/canvases/$(canvasId)).data.ownerId == request.auth.uid;
+    }
+    
     // Canvas collection rules
     match /canvases/{canvasId} {
-      // Allow authenticated users to read/write canvas metadata
-      allow read, write: if isAuthenticated();
+      // Allow authenticated users to read canvas metadata
+      allow read: if isAuthenticated();
+      // Only allow write if owner exists OR setting initial owner
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && 
+                      (isCanvasOwner(canvasId) || !exists(/databases/$(database)/documents/canvases/$(canvasId)));
       
       // Canvas objects (shapes)
       match /objects/{objectId} {
@@ -30,8 +41,10 @@ service cloud.firestore {
       // User presence
       match /presence/{userId} {
         allow read: if isAuthenticated();
-        // Users can only write their own presence
-        allow create, update, delete: if isAuthenticated() && request.auth.uid == userId;
+        // Users can write their own presence, OR owner can update any presence (for kicking)
+        allow create, update: if isAuthenticated() && 
+                                (request.auth.uid == userId || isCanvasOwner(canvasId));
+        allow delete: if isAuthenticated() && request.auth.uid == userId;
       }
     }
   }

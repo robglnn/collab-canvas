@@ -16,11 +16,13 @@ A real-time collaborative canvas application built with React, Firebase, and Kon
 ## ✨ Features (MVP)
 
 ### Core Canvas Features
-- **5000x5000px workspace** with pan (drag) and zoom (scroll wheel)
-- **Rectangle creation** - Click toolbar button, then click canvas to place
+- **5000x5000px workspace** with pan (drag) and smooth cursor-centered zoom (scroll wheel)
+- **Rectangle creation** - Click toolbar button, then click canvas to place (random colors)
 - **Free-form resizing** - 8 handles (4 corners + 4 middles) for any aspect ratio
-- **Shape manipulation** - Drag to move, resize, delete with Delete key
-- **Canvas boundaries** - Prevents panning beyond 5000x5000px limits
+- **Shape rotation** - 360° rotation via Konva Transformer handles
+- **Shape manipulation** - Drag to move, resize, rotate, delete (right-click or Delete key)
+- **Canvas boundaries** - Visual gray/white distinction, prevents panning beyond limits
+- **Debug panel** - Real-time metrics: zoom, canvas center, cursor position, user/shape counts
 
 ### Real-Time Collaboration
 - **Multi-user cursor sync** - See everyone's mouse position with name labels
@@ -113,12 +115,10 @@ src/
 - ✅ **PR #1-6:** Setup, Auth, Canvas, Shapes, Real-time Sync, Cursor Sync
 - ✅ **PR #7:** User Presence System  
 - ✅ **PR #8:** Shape Locking + Owner Override
-- ✅ **PR #9:** Kick User (partial implementation)
+- ✅ **PR #9:** Kick User Feature
 - ✅ **PR #10:** State Persistence & Reconnection
-- 🚧 **PR #11:** Polish, Performance & Bug Fixes (in progress)
-
-### Upcoming
-- ⏳ **PR #12:** Final Deployment & MVP Testing
+- ✅ **PR #11:** Polish, Performance & Bug Fixes (rotation, smooth zoom, presence cleanup, cursor cleanup, lock cleanup, auth styling)
+- ✅ **PR #12:** Final Deployment & MVP Testing
 
 ---
 
