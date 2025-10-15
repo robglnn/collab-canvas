@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
+import { collection, getDocs } from 'firebase/firestore';
 import { useFirestore } from './useFirestore';
 import { useAuth } from './useAuth';
+import { db } from '../lib/firebase';
 import {
   addShape as addShapeToFirestore,
   updateShape as updateShapeInFirestore,
@@ -68,6 +70,48 @@ export function useCanvas() {
       setIsOwner(canvasMetadata.ownerId === user.uid);
     }
   }, [user, canvasMetadata]);
+
+  /**
+   * Cleanup locks from offline users
+   * Periodically checks locked shapes and releases locks if user is offline
+   */
+  useEffect(() => {
+    if (!user || shapes.length === 0) return;
+
+    const cleanupLocks = async () => {
+      try {
+        // Get all presence documents to check who's online
+        const presenceRef = collection(db, 'canvases', 'main', 'presence');
+        const presenceSnapshot = await getDocs(presenceRef);
+        
+        const onlineUserIds = new Set();
+        presenceSnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.online) {
+            onlineUserIds.add(doc.id);
+          }
+        });
+
+        // Check each locked shape
+        for (const shape of shapes) {
+          if (shape.lockedBy && !onlineUserIds.has(shape.lockedBy)) {
+            console.log(`Unlocking shape ${shape.id} - user ${shape.lockedBy} is offline`);
+            await unlockShapeInFirestore(shape.id);
+          }
+        }
+      } catch (error) {
+        console.error('Error cleaning up locks:', error);
+      }
+    };
+
+    // Run cleanup every 5 seconds
+    const interval = setInterval(cleanupLocks, 5000);
+    
+    // Also run immediately
+    cleanupLocks();
+
+    return () => clearInterval(interval);
+  }, [user, shapes]);
 
   /**
    * Add a new shape with optimistic update

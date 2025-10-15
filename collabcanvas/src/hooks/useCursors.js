@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   collection, 
   doc, 
-  setDoc, 
+  setDoc,
+  deleteDoc,
   onSnapshot,
   serverTimestamp 
 } from 'firebase/firestore';
@@ -110,13 +111,9 @@ export function useCursors() {
 
     try {
       const cursorRef = doc(db, 'canvases', CANVAS_ID, 'cursors', user.uid);
-      await setDoc(cursorRef, {
-        x: -1000, // Move off-screen
-        y: -1000,
-        userName: user.displayName,
-        photoURL: user.photoURL || null,
-        lastUpdate: serverTimestamp(),
-      });
+      // Delete the cursor document completely
+      await deleteDoc(cursorRef);
+      console.log('Cursor removed for user:', user.displayName);
     } catch (error) {
       console.error('Error removing cursor:', error);
     }

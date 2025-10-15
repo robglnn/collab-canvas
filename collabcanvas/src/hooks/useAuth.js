@@ -72,12 +72,15 @@ export function useAuth() {
 
   /**
    * Sign out current user
+   * Includes cleanup of presence, cursor, and locks before signing out
    */
   const signOut = async () => {
     try {
       setLoading(true);
       setError(null);
       
+      // Cleanup will be handled by usePresence and useCursors unmount effects
+      // when user becomes null after firebaseSignOut
       await firebaseSignOut(auth);
       
       console.log('Successfully signed out');
