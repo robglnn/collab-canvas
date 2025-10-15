@@ -5,21 +5,9 @@ import './Auth.css';
  * Authentication component
  * Displays sign-in page when user is not authenticated
  * Shows user info and sign-out button when authenticated
- * 
- * @param {Function} onBeforeSignOut - Optional callback to run before signing out (e.g., set presence offline)
  */
-export default function Auth({ children, onBeforeSignOut }) {
+export default function Auth({ children }) {
   const { user, loading, error, signInWithGoogle, signOut } = useAuth();
-
-  // Handle sign out with cleanup
-  const handleSignOut = async () => {
-    // Call cleanup before signing out
-    if (onBeforeSignOut) {
-      await onBeforeSignOut();
-    }
-    // Then sign out
-    await signOut();
-  };
 
   // Show loading spinner while checking auth state
   if (loading) {
@@ -87,7 +75,7 @@ export default function Auth({ children, onBeforeSignOut }) {
           
           <button 
             className="signout-btn" 
-            onClick={handleSignOut}
+            onClick={signOut}
             disabled={loading}
           >
             Sign Out
