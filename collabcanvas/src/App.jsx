@@ -28,7 +28,7 @@ function App() {
   }, [user]);
 
   // Use presence hook to track users
-  const { users, onlineCount, isOwner, wasKicked, kickUser } = usePresence(ownerId);
+  const { users, onlineCount, isOwner, wasKicked, kickUser, setUserOfflineBeforeSignout } = usePresence(ownerId);
 
   // Show kicked message if user was removed
   if (wasKicked) {
@@ -53,7 +53,7 @@ function App() {
   }
 
   return (
-    <Auth>
+    <Auth onBeforeSignOut={setUserOfflineBeforeSignout}>
       <Canvas />
       {user && (
         <UserList 

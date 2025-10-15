@@ -70,22 +70,20 @@ export function usePresence(canvasOwnerId) {
 
     setUserOnline();
 
-    // Set user offline on unmount
+    // Cleanup on unmount - NOTE: This may not complete if unmount is abrupt
+    // For reliable signout, use setUserOfflineBeforeSignout() explicitly
     return () => {
-      const setUserOffline = async () => {
-        try {
-          const presenceRef = doc(db, 'canvases', CANVAS_ID, 'presence', user.uid);
-          await setDoc(presenceRef, {
-            online: false,
-            lastSeen: serverTimestamp(),
-          }, { merge: true });
-          console.log('User presence set to offline');
-        } catch (error) {
-          console.error('Error setting user offline:', error);
-        }
-      };
-
-      setUserOffline();
+      // Use navigator.sendBeacon for best-effort cleanup
+      // This works better than async during unmount
+      const presenceRef = doc(db, 'canvases', CANVAS_ID, 'presence', user.uid);
+      
+      // Synchronous fallback attempt
+      setDoc(presenceRef, {
+        online: false,
+        lastSeen: serverTimestamp(),
+      }, { merge: true }).catch(err => {
+        console.error('Error setting user offline on unmount:', err);
+      });
     };
   }, [user, canvasOwnerId]);
 
@@ -211,12 +209,32 @@ export function usePresence(canvasOwnerId) {
     }
   };
 
+  /**
+   * Set user offline before signout (for explicit sign-out button)
+   * Call this BEFORE signOut() to ensure presence is updated
+   */
+  const setUserOfflineBeforeSignout = async () => {
+    if (!user) return;
+    
+    try {
+      const presenceRef = doc(db, 'canvases', CANVAS_ID, 'presence', user.uid);
+      await setDoc(presenceRef, {
+        online: false,
+        lastSeen: serverTimestamp(),
+      }, { merge: true });
+      console.log('User explicitly set to offline before signout');
+    } catch (error) {
+      console.error('Error setting user offline before signout:', error);
+    }
+  };
+
   return {
     users,
     onlineCount,
     isOwner,
     wasKicked,
     kickUser,
+    setUserOfflineBeforeSignout,
   };
 }
 
