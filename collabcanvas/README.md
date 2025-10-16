@@ -12,6 +12,7 @@ A real-time collaborative canvas application built with React, Firebase, and Kon
 - **Canvas:** Konva.js + React-Konva
 - **Backend:** Firebase (Firestore + Authentication + Hosting)
 - **Auth:** Google OAuth via Firebase Authentication
+- **AI:** OpenAI GPT-4 Turbo for natural language commands
 
 ## ✨ Features (MVP)
 
@@ -42,6 +43,23 @@ A real-time collaborative canvas application built with React, Firebase, and Kon
 - **Reconnection handling** - 3-second disconnect banner with refresh prompt
 - **Firestore sync** - All data persisted in real-time database
 
+### 🤖 AI Canvas Agent (NEW!)
+- **Natural language commands** - Control canvas with plain English
+- **Smart shape creation** - "Create 5 blue circles in a row"
+- **Layout automation** - "Arrange these shapes in a grid"
+- **UI templates** - "Create a login form" or "Make a dashboard"
+- **Undo/Redo integration** - AI commands are fully undoable
+- **Rate limiting** - 5 second cooldown per user, 300/minute per canvas
+- **Multi-user coordination** - Queue system prevents conflicts
+
+#### Supported Commands
+- **Creation:** "Create 3 rectangles", "Add a circle at 500, 600"
+- **Manipulation:** "Move selected shapes right", "Rotate all squares 45 degrees"
+- **Layout:** "Arrange horizontally", "Create a 3x3 grid", "Align shapes to the left"
+- **Selection:** "Select all red shapes", "Deselect everything"
+- **Templates:** "Create a login form", "Make a nav bar", "Build a dashboard", "Add a sidebar"
+- **Queries:** "How many shapes are there?", "What colors are being used?"
+
 ## 🏃 Development Setup
 
 ### Prerequisites
@@ -66,7 +84,10 @@ A real-time collaborative canvas application built with React, Firebase, and Kon
    VITE_FIREBASE_STORAGE_BUCKET=your_storage_bucket
    VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
    VITE_FIREBASE_APP_ID=your_app_id
+   VITE_OPENAI_API_KEY=your_openai_api_key
    ```
+
+   **Note:** Get your OpenAI API key from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 
 4. Start development server:
    ```bash
@@ -112,13 +133,16 @@ src/
 
 ### Completed PRs
 
-- ✅ **PR #1-6:** Setup, Auth, Canvas, Shapes, Real-time Sync, Cursor Sync
-- ✅ **PR #7:** User Presence System  
-- ✅ **PR #8:** Shape Locking + Owner Override
-- ✅ **PR #9:** Kick User Feature
-- ✅ **PR #10:** State Persistence & Reconnection
-- ✅ **PR #11:** Polish, Performance & Bug Fixes (rotation, smooth zoom, presence cleanup, cursor cleanup, lock cleanup, auth styling)
-- ✅ **PR #12:** Final Deployment & MVP Testing
+- ✅ **PR #1-12:** MVP (Setup, Auth, Canvas, Shapes, Real-time Sync, Cursor Sync, Presence, Locking, State Persistence)
+- ✅ **PR #13-14:** Advanced Color System + Rename Square
+- ✅ **PR #15:** Circle Tool
+- ✅ **PR #16:** Line Tool (Basic)
+- ✅ **PR #17:** Text Tool
+- ✅ **PR #18:** Multi-Select with Selection Box
+- ✅ **PR #19:** Copy/Paste Shapes
+- ✅ **PR #20:** Arrow Key Movement
+- ✅ **PR #21:** Undo/Redo System (50 steps)
+- ✅ **PR #26-29:** AI Canvas Agent (Core, Advanced Commands, Queue System, Polish & Optimization)
 
 ---
 
@@ -127,9 +151,11 @@ src/
 ```
 /canvases/main/
 ├── metadata/           # Canvas owner, created timestamp
-├── objects/{id}/       # Shapes (x, y, width, height, lockedBy, createdBy)
+├── objects/{id}/       # Shapes (x, y, width, height, lockedBy, createdBy, createdByAI)
 ├── cursors/{userId}/   # Real-time cursor positions (x, y, userName)
-└── presence/{userId}/  # User online status (userName, role, online, kicked)
+├── presence/{userId}/  # User online status (userName, role, online, kicked)
+├── aiCommands/{id}/    # AI command queue (command, userId, status, timestamp)
+└── aiRateLimits/{userId}/  # Rate limit tracking (lastCommandTime, commandCount)
 ```
 
 ## 🎨 Color Coding
@@ -139,6 +165,54 @@ src/
 - **Red outline:** Locked by another user  
 - **Black:** Unlocked shape
 
+## 🤖 AI Command Examples
+
+### Simple Commands
+```
+"Create 5 blue circles in a row"
+"Make a red square at 1000, 2000"
+"Rotate selected shapes 90 degrees"
+"Delete all rectangles"
+```
+
+### Layout Commands
+```
+"Arrange these shapes in a 3x3 grid"
+"Align all shapes to the left"
+"Space these elements evenly horizontally"
+```
+
+### UI Templates
+```
+"Create a login form"
+"Make a navigation bar with Home, About, Contact"
+"Build a dashboard with 6 cards"
+"Add a sidebar with 5 menu items"
+```
+
+### Advanced Commands
+```
+"Create 10 squares in a grid and color them blue"
+"Make a button that says Submit and center it"
+"Build a card layout with title and description"
+```
+
+## ⚙️ AI Configuration
+
+The AI agent uses OpenAI's GPT-4 Turbo for fast, accurate command interpretation.
+
+**Rate Limits:**
+- 5 seconds between commands per user
+- 300 commands per minute per canvas
+- Visual cooldown timer in UI
+
+**Features:**
+- Input sanitization (XSS protection)
+- Parameter validation (bounds checking)
+- Partial success handling with detailed feedback
+- Integration with undo/redo system
+- Multi-user queue system
+
 ---
 
-Built with ❤️ as a Figma-like collaborative canvas MVP
+Built with ❤️ as a Figma-like collaborative canvas with AI superpowers

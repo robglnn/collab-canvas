@@ -28,6 +28,25 @@ export default function AICommandBar({ onSubmit, isProcessing = false, showSucce
   const MAX_CHARS = 200;
   const CHAR_WARNING_THRESHOLD = 150;
 
+  /**
+   * Sanitize user input to prevent XSS and ensure clean commands
+   * @param {string} input - Raw user input
+   * @returns {string} Sanitized input
+   */
+  const sanitizeInput = (input) => {
+    // Remove HTML tags and scripts
+    let sanitized = input.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    sanitized = sanitized.replace(/<[^>]*>/g, '');
+    
+    // Remove special characters that could be problematic
+    sanitized = sanitized.replace(/[<>]/g, '');
+    
+    // Normalize whitespace
+    sanitized = sanitized.replace(/\s+/g, ' ');
+    
+    return sanitized;
+  };
+
   // Auto-expand textarea as user types
   useEffect(() => {
     if (textareaRef.current) {
@@ -42,7 +61,7 @@ export default function AICommandBar({ onSubmit, isProcessing = false, showSucce
   }, [command]);
 
   const handleInputChange = (e) => {
-    const value = e.target.value;
+    const value = sanitizeInput(e.target.value);
     if (value.length <= MAX_CHARS) {
       setCommand(value);
     }
@@ -50,9 +69,17 @@ export default function AICommandBar({ onSubmit, isProcessing = false, showSucce
 
   const handleSubmit = () => {
     const trimmedCommand = command.trim();
-    if (trimmedCommand && !isProcessing) {
-      onSubmit(trimmedCommand);
-      // Don't clear command immediately - let parent control this
+    
+    // Additional validation before submission
+    if (!trimmedCommand) return;
+    if (trimmedCommand.length < 2) return;
+    if (isProcessing || isOnCooldown) return;
+    
+    // Final sanitization before sending
+    const sanitizedCommand = sanitizeInput(trimmedCommand);
+    
+    if (sanitizedCommand) {
+      onSubmit(sanitizedCommand);
     }
   };
 

@@ -96,6 +96,60 @@ function generateShapeId() {
 }
 
 /**
+ * Validate and clamp numeric value to canvas bounds
+ * @param {number} value - Value to validate
+ * @param {number} min - Minimum value
+ * @param {number} max - Maximum value
+ * @param {number} defaultValue - Default value if invalid
+ * @returns {number} Clamped value
+ */
+function clampValue(value, min, max, defaultValue) {
+  if (typeof value !== 'number' || isNaN(value)) {
+    return defaultValue;
+  }
+  return Math.max(min, Math.min(max, value));
+}
+
+/**
+ * Validate and sanitize shape properties
+ * @param {Object} shape - Shape object to validate
+ * @returns {Object} Validated shape
+ */
+function validateShapeProperties(shape) {
+  const validated = { ...shape };
+  
+  // Clamp coordinates to canvas bounds (with 500px margin for partial visibility)
+  validated.x = clampValue(validated.x, -500, 5500, 2500);
+  validated.y = clampValue(validated.y, -500, 5500, 2500);
+  
+  // Validate dimensions
+  if (validated.width !== undefined) {
+    validated.width = clampValue(validated.width, 10, 2000, 100);
+  }
+  if (validated.height !== undefined) {
+    validated.height = clampValue(validated.height, 10, 2000, 100);
+  }
+  if (validated.radius !== undefined) {
+    validated.radius = clampValue(validated.radius, 5, 1000, 50);
+  }
+  if (validated.fontSize !== undefined) {
+    validated.fontSize = clampValue(validated.fontSize, 8, 200, 24);
+  }
+  
+  // Validate rotation
+  if (validated.rotation !== undefined) {
+    validated.rotation = validated.rotation % 360;
+  }
+  
+  // Sanitize text content
+  if (validated.text !== undefined && typeof validated.text === 'string') {
+    validated.text = validated.text.replace(/<[^>]*>/g, '').substring(0, 500);
+  }
+  
+  return validated;
+}
+
+/**
  * Resolve shape IDs, handling special keywords like "selected"
  * @param {Array<string>} shapeIds - Array of shape IDs or special keywords
  * @param {Object} context - Canvas context with shapes and selectedShapeIds
@@ -199,6 +253,9 @@ async function createShape(args, context) {
       newShape.fontFamily = 'Arial';
       newShape.align = 'left';
     }
+
+    // Validate and sanitize shape properties
+    newShape = validateShapeProperties(newShape);
 
     await addShape(newShape);
     createdShapes.push(newShape);
@@ -1082,6 +1139,92 @@ async function createUITemplate(args, context) {
           fontSize: 18,
           width: 150
         }, commandId, user, addShape));
+
+        break;
+
+      case 'dashboard':
+        // Dashboard: Title + grid of cards (2x2 by default)
+        const cardCount = customization.cardCount || 4;
+        const cols = customization.cols || 2;
+        const rows = Math.ceil(cardCount / cols);
+        const cardWidth = 250;
+        const cardHeight = 300;
+        const spacing = 30;
+
+        // Dashboard title
+        createdShapes.push(await createTemplateShape({
+          type: 'text',
+          x: defaultX,
+          y: defaultY,
+          text: customization.title || 'Dashboard',
+          fontSize: 36,
+          width: 600
+        }, commandId, user, addShape));
+
+        // Create grid of cards
+        for (let i = 0; i < cardCount; i++) {
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+          const cardX = defaultX + col * (cardWidth + spacing);
+          const cardY = defaultY + 80 + row * (cardHeight + spacing);
+
+          // Card background
+          createdShapes.push(await createTemplateShape({
+            type: 'rectangle',
+            x: cardX,
+            y: cardY,
+            width: cardWidth,
+            height: cardHeight
+          }, commandId, user, addShape));
+
+          // Card title
+          createdShapes.push(await createTemplateShape({
+            type: 'text',
+            x: cardX + 15,
+            y: cardY + 15,
+            text: `Card ${i + 1}`,
+            fontSize: 20,
+            width: cardWidth - 30
+          }, commandId, user, addShape));
+
+          // Card content placeholder
+          createdShapes.push(await createTemplateShape({
+            type: 'rectangle',
+            x: cardX + 15,
+            y: cardY + 60,
+            width: cardWidth - 30,
+            height: cardHeight - 80
+          }, commandId, user, addShape));
+        }
+
+        break;
+
+      case 'sidebar':
+        // Sidebar: Background + menu items
+        const sidebarItems = customization.menuItems || ['Dashboard', 'Profile', 'Settings', 'Logout'];
+        const sidebarWidth = 200;
+        const sidebarHeight = 600;
+
+        // Sidebar background
+        createdShapes.push(await createTemplateShape({
+          type: 'rectangle',
+          x: defaultX,
+          y: defaultY,
+          width: sidebarWidth,
+          height: sidebarHeight
+        }, commandId, user, addShape));
+
+        // Menu items
+        for (let i = 0; i < sidebarItems.length; i++) {
+          createdShapes.push(await createTemplateShape({
+            type: 'text',
+            x: defaultX + 20,
+            y: defaultY + 30 + i * 60,
+            text: sidebarItems[i],
+            fontSize: 16,
+            width: sidebarWidth - 40
+          }, commandId, user, addShape));
+        }
 
         break;
 

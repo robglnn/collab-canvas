@@ -63,6 +63,12 @@ export function useAI(canvasContext) {
     startCooldownTimer();
 
     try {
+      // Take snapshot for undo/redo BEFORE executing AI command
+      if (canvasContext.takeSnapshot && canvasContext.shapes) {
+        canvasContext.takeSnapshot(canvasContext.shapes);
+        console.log('Snapshot taken for undo/redo');
+      }
+
       // Build canvas context for AI
       const context = buildContext(canvasContext);
 
@@ -138,6 +144,9 @@ export function useAI(canvasContext) {
     const actions = [];
     const errors = [];
     let overallSuccess = true;
+    let totalShapesCreated = 0;
+    let totalShapesModified = 0;
+    let totalShapesDeleted = 0;
 
     for (const toolCall of toolCalls) {
       const functionName = toolCall.function.name;
@@ -153,6 +162,16 @@ export function useAI(canvasContext) {
           args,
           ...result
         });
+
+        // Count shapes for better feedback
+        if (result.success && result.data) {
+          if (result.data.count) totalShapesCreated += result.data.count;
+          if (result.data.movedShapeIds) totalShapesModified += result.data.movedShapeIds.length;
+          if (result.data.resizedShapeIds) totalShapesModified += result.data.resizedShapeIds.length;
+          if (result.data.rotatedShapeIds) totalShapesModified += result.data.rotatedShapeIds.length;
+          if (result.data.updatedShapeIds) totalShapesModified += result.data.updatedShapeIds.length;
+          if (result.data.deletedShapeIds) totalShapesDeleted += result.data.deletedShapeIds.length;
+        }
 
         if (!result.success) {
           overallSuccess = false;
@@ -175,27 +194,54 @@ export function useAI(canvasContext) {
       }
     }
 
-    // Generate summary message
+    // Generate enhanced summary message with shape counts
     const successCount = actions.filter(a => a.success).length;
     const totalCount = actions.length;
     
     let summaryMessage;
     if (overallSuccess && successCount === totalCount) {
-      // All succeeded
-      summaryMessage = actions.map(a => a.message).join('. ');
+      // All succeeded - provide detailed feedback
+      const parts = [];
+      if (totalShapesCreated > 0) parts.push(`Created ${totalShapesCreated} shape${totalShapesCreated > 1 ? 's' : ''}`);
+      if (totalShapesModified > 0) parts.push(`Modified ${totalShapesModified} shape${totalShapesModified > 1 ? 's' : ''}`);
+      if (totalShapesDeleted > 0) parts.push(`Deleted ${totalShapesDeleted} shape${totalShapesDeleted > 1 ? 's' : ''}`);
+      
+      if (parts.length > 0) {
+        summaryMessage = parts.join(', ');
+      } else {
+        summaryMessage = actions.map(a => a.message).join('. ');
+      }
     } else if (successCount > 0) {
-      // Partial success
-      summaryMessage = `Completed ${successCount}/${totalCount} actions. ${errors.join('. ')}`;
+      // Partial success - be specific about what worked
+      const parts = [];
+      if (totalShapesCreated > 0) parts.push(`created ${totalShapesCreated}`);
+      if (totalShapesModified > 0) parts.push(`modified ${totalShapesModified}`);
+      if (totalShapesDeleted > 0) parts.push(`deleted ${totalShapesDeleted}`);
+      
+      const failCount = totalCount - successCount;
+      summaryMessage = `Partial success: ${parts.join(', ')} shape${parts.length > 1 || (totalShapesCreated + totalShapesModified + totalShapesDeleted) > 1 ? 's' : ''}. ${failCount} action${failCount > 1 ? 's' : ''} failed (${errors[0] || 'locked or not found'})`;
     } else {
-      // All failed
-      summaryMessage = `All actions failed: ${errors.join('. ')}`;
+      // All failed - provide helpful error message
+      const errorMsg = errors[0] || 'Unknown error';
+      if (errorMsg.includes('locked')) {
+        summaryMessage = `Action failed: Some shapes are locked by other users. Try selecting unlocked shapes or ask the owner to release them.`;
+      } else if (errorMsg.includes('not found')) {
+        summaryMessage = `Action failed: Shapes not found. Try creating shapes first or selecting existing ones.`;
+      } else {
+        summaryMessage = `Action failed: ${errorMsg}`;
+      }
     }
 
     return {
       success: overallSuccess,
       message: summaryMessage,
       actions,
-      errors: errors.length > 0 ? errors : undefined
+      errors: errors.length > 0 ? errors : undefined,
+      stats: {
+        created: totalShapesCreated,
+        modified: totalShapesModified,
+        deleted: totalShapesDeleted
+      }
     };
   }
 
