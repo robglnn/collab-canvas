@@ -329,13 +329,22 @@ Canvas Rendering (Konva.js)
 - 🎯 Google profile photos shown next to cursors
 
 ### Explicitly Out of Scope for MVP
-- ❌ Undo/Redo functionality (added in PR #21)
-- ❌ Multi-select (added in PR #18)
-- ❌ Shape customization (added in PRs #13-17)
-- ❌ Additional shape types beyond rectangles (added in PRs #15-17)
+
+**✅ Now Implemented (Post-MVP):**
+- ✅ Undo/Redo functionality (PR #21 - COMPLETE)
+- ✅ Multi-select with selection box (PR #18 - COMPLETE)
+- ✅ Resize & Rotate transforms (PR #18.5 - COMPLETE)
+- ✅ Additional shape types: Circle (PR #15 - COMPLETE), Text (PR #17 - COMPLETE)
+- ✅ Copy/Paste/Duplicate (PR #19 - COMPLETE)
+- ✅ Arrow key movement (PR #20 - COMPLETE)
+
+**⬜ Still Out of Scope:**
+- ❌ Shape customization (colors, borders) (PRs #13-14)
 - ❌ Mobile/touch device support
 - ❌ Owner transfer/reassignment
-- ❌ AI Canvas Agent (added in PRs #26-29)
+
+**🚀 In Progress:**
+- 🔄 AI Canvas Agent (PRs #26-29 - NEXT)
 
 ---
 
@@ -366,9 +375,14 @@ All decisions have been made. Time to start building:
 - [x] **Canvas Model:** Single shared canvas (5000x5000px) - all authenticated users see same canvas
 - [x] **Shape Creation:** Toolbar button → cursor changes → click once to place → auto-exit place mode
 - [x] **Shape Appearance:** All rectangles same color, no customization for MVP
-- [x] **Shape Selection:** Single selection only (no multi-select)
-- [x] **Shape Deletion:** Select shape → press Delete key
-- [x] **Pan & Zoom:** Left-click drag to pan, scroll wheel to zoom
+- [x] **Shape Types:** ✅ Rectangles, ✅ Circles (PR #15), ✅ Text (PR #17)
+- [x] **Shape Selection:** ✅ Multi-select with selection box (PR #18), Shift-click to add
+- [x] **Shape Manipulation:** ✅ Resize & Rotate transforms (PR #18.5)
+- [x] **Shape Deletion:** Select shape(s) → press Delete key
+- [x] **Copy/Paste:** ✅ Ctrl+C/V/D for copy/paste/duplicate (PR #19)
+- [x] **Arrow Keys:** ✅ Move shapes 1px or 10px with Shift (PR #20)
+- [x] **Undo/Redo:** ✅ Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y (PR #21)
+- [x] **Pan & Zoom:** Left-click drag, middle-click drag, scroll wheel (up/down), Shift+scroll (left/right), Ctrl+scroll (zoom)
 - [x] **Owner Assignment:** First user to load app becomes permanent owner
 - [x] **Owner Controls:** Can kick users (shapes remain) + gets priority lock + can override locked shapes via right-click menu
 - [x] **Cursor Update Frequency:** 10-20 updates/second (50-100ms)
@@ -376,4 +390,4 @@ All decisions have been made. Time to start building:
 - [x] **Conflict Resolution:** Last-write-wins + owner priority lock
 - [x] **Reconnect Strategy:** Show banner after 3 seconds → prompt refresh → fetch full state, don't merge
 - [x] **Optimistic Updates:** Roll back on Firestore write failure
-- [x] **Out of Scope:** Undo/redo, multi-select, shape customization, mobile support
+- [x] **Originally Out of Scope:** ~~Undo/redo~~ ✅ (PR #21), ~~multi-select~~ ✅ (PR #18), shape customization (still pending), mobile support (still pending)
