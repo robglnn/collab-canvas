@@ -24,7 +24,7 @@ export function useCanvas() {
   const { user } = useAuth();
   const { shapes: firestoreShapes, canvasMetadata, loading, isConnected, showDisconnectBanner } = useFirestore();
   
-  const [selectedShapeId, setSelectedShapeId] = useState(null);
+  const [selectedShapeIds, setSelectedShapeIds] = useState([]);
   const [isOwner, setIsOwner] = useState(false);
   const [ownerId, setOwnerId] = useState(null);
 
@@ -161,47 +161,75 @@ export function useCanvas() {
   }, [user, shapes]);
 
   /**
-   * Delete a shape with optimistic update
+   * Delete shape(s) with optimistic update
    * 
-   * @param {string} shapeId - ID of shape to delete
+   * @param {string|string[]} shapeIds - ID(s) of shape(s) to delete
    */
-  const deleteShape = useCallback(async (shapeId) => {
+  const deleteShape = useCallback(async (shapeIds) => {
     if (!user) {
       console.error('User not authenticated');
       return;
     }
 
-    // Clear selection if deleted shape was selected
-    if (selectedShapeId === shapeId) {
-      setSelectedShapeId(null);
-    }
+    const idsArray = Array.isArray(shapeIds) ? shapeIds : [shapeIds];
+
+    // Clear selection for deleted shapes
+    setSelectedShapeIds(prev => prev.filter(id => !idsArray.includes(id)));
 
     try {
-      // Delete happens through Firestore listener (optimistic)
-      await deleteShapeFromFirestore(shapeId);
+      // Delete each shape
+      await Promise.all(idsArray.map(id => deleteShapeFromFirestore(id)));
     } catch (error) {
-      console.error('Failed to delete shape:', error);
-      // Firestore listener will restore shape if delete failed
-      alert('Failed to delete shape. Please try again.');
+      console.error('Failed to delete shape(s):', error);
+      // Firestore listener will restore shapes if delete failed
+      alert('Failed to delete shape(s). Please try again.');
     }
-  }, [user, selectedShapeId]);
+  }, [user]);
 
   /**
-   * Select a shape
+   * Select shape(s)
    * 
-   * @param {string|null} shapeId - ID of shape to select, or null to deselect
+   * @param {string|string[]} shapeIds - ID(s) of shape(s) to select
+   * @param {boolean} addToSelection - If true, add to existing selection (Shift-click)
    */
-  const selectShape = useCallback((shapeId) => {
-    setSelectedShapeId(shapeId);
-    console.log('Shape selected:', shapeId);
+  const selectShape = useCallback((shapeIds, addToSelection = false) => {
+    const idsArray = Array.isArray(shapeIds) ? shapeIds : [shapeIds];
+    
+    if (addToSelection) {
+      // Add to existing selection (for Shift-click)
+      setSelectedShapeIds(prev => {
+        const newSelection = [...prev];
+        idsArray.forEach(id => {
+          if (!newSelection.includes(id)) {
+            newSelection.push(id);
+          }
+        });
+        return newSelection;
+      });
+      console.log(`Added ${idsArray.length} shape(s) to selection`);
+    } else {
+      // Replace selection
+      setSelectedShapeIds(idsArray);
+      console.log(`Selected ${idsArray.length} shape(s):`, idsArray);
+    }
   }, []);
 
   /**
-   * Deselect current shape
+   * Deselect all shapes or specific shape(s)
+   * 
+   * @param {string|string[]|null} shapeIds - Shape ID(s) to deselect, or null for all
    */
-  const deselectShape = useCallback(() => {
-    setSelectedShapeId(null);
-    console.log('Shape deselected');
+  const deselectShape = useCallback((shapeIds = null) => {
+    if (shapeIds === null) {
+      // Deselect all
+      setSelectedShapeIds([]);
+      console.log('All shapes deselected');
+    } else {
+      // Deselect specific shape(s)
+      const idsArray = Array.isArray(shapeIds) ? shapeIds : [shapeIds];
+      setSelectedShapeIds(prev => prev.filter(id => !idsArray.includes(id)));
+      console.log(`Deselected shape(s):`, idsArray);
+    }
   }, []);
 
   /**
@@ -278,7 +306,7 @@ export function useCanvas() {
 
   return {
     shapes,
-    selectedShapeId,
+    selectedShapeIds,
     isOwner,
     ownerId,
     loading,

@@ -40,6 +40,10 @@ export default function Canvas() {
   // Context menu state
   const [contextMenu, setContextMenu] = useState(null);
   
+  // Selection box state (for drag-to-select)
+  const [selectionBox, setSelectionBox] = useState(null); // { startX, startY, endX, endY }
+  const [isSelecting, setIsSelecting] = useState(false);
+  
   // Cursor position on canvas (for debug display)
   const [cursorCanvasPos, setCursorCanvasPos] = useState({ x: 0, y: 0 });
 
@@ -49,7 +53,7 @@ export default function Canvas() {
   // Canvas state hook
   const {
     shapes,
-    selectedShapeId,
+    selectedShapeIds,
     isOwner,
     ownerId,
     loading,
@@ -150,18 +154,18 @@ export default function Canvas() {
   }, [CANVAS_WIDTH, CANVAS_HEIGHT, SPAWN_CANVAS_X, SPAWN_CANVAS_Y, SPAWN_ZOOM, isInitialized, calculateStagePosition]);
 
   /**
-   * Handle keyboard events (Delete key)
+   * Handle keyboard events (Delete key for multi-delete)
    */
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Delete' && selectedShapeId) {
-        deleteShape(selectedShapeId);
+      if (e.key === 'Delete' && selectedShapeIds.length > 0) {
+        deleteShape(selectedShapeIds);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedShapeId, deleteShape]);
+  }, [selectedShapeIds, deleteShape]);
 
   /**
    * Clamp viewport position to stay within canvas boundaries
@@ -242,6 +246,86 @@ export default function Canvas() {
   }, [stageScale, clampPosition]);
 
   /**
+   * Handle mouse down - start selection box or pan
+   */
+  const handleMouseDown = (e) => {
+    // If clicked on a shape, don't start selection box
+    if (e.target !== stageRef.current) {
+      return;
+    }
+
+    // If in place mode, don't start selection box
+    if (placeMode) {
+      return;
+    }
+
+    // Start selection box
+    const stage = stageRef.current;
+    const pointerPos = stage.getPointerPosition();
+    const canvasPos = screenToCanvas(pointerPos, stage);
+
+    setSelectionBox({
+      startX: canvasPos.x,
+      startY: canvasPos.y,
+      endX: canvasPos.x,
+      endY: canvasPos.y
+    });
+    setIsSelecting(true);
+  };
+
+  /**
+   * Handle mouse move - update selection box
+   */
+  const handleMouseMoveForSelection = (e) => {
+    if (!isSelecting) return;
+
+    const stage = stageRef.current;
+    const pointerPos = stage.getPointerPosition();
+    const canvasPos = screenToCanvas(pointerPos, stage);
+
+    setSelectionBox(prev => ({
+      ...prev,
+      endX: canvasPos.x,
+      endY: canvasPos.y
+    }));
+  };
+
+  /**
+   * Handle mouse up - complete selection box
+   */
+  const handleMouseUp = () => {
+    if (!isSelecting) return;
+
+    setIsSelecting(false);
+
+    if (!selectionBox) return;
+
+    // Calculate selection box bounds
+    const box = {
+      x: Math.min(selectionBox.startX, selectionBox.endX),
+      y: Math.min(selectionBox.startY, selectionBox.endY),
+      width: Math.abs(selectionBox.endX - selectionBox.startX),
+      height: Math.abs(selectionBox.endY - selectionBox.startY)
+    };
+
+    // Find shapes that intersect with selection box
+    const selectedIds = shapes.filter(shape => {
+      return (
+        shape.x < box.x + box.width &&
+        shape.x + shape.width > box.x &&
+        shape.y < box.y + box.height &&
+        shape.y + shape.height > box.y
+      );
+    }).map(shape => shape.id);
+
+    if (selectedIds.length > 0) {
+      selectShape(selectedIds);
+    }
+
+    setSelectionBox(null);
+  };
+
+  /**
    * Handle drag start
    */
   const handleDragStart = (e) => {
@@ -271,7 +355,7 @@ export default function Canvas() {
   };
 
   /**
-   * Handle mouse move - update cursor position in Firestore and debug display
+   * Handle mouse move - update cursor position, selection box, and debug display
    */
   const handleMouseMove = (e) => {
     const stage = stageRef.current;
@@ -280,6 +364,11 @@ export default function Canvas() {
     // Get pointer position relative to stage container (screen coordinates)
     const pointerPos = stage.getPointerPosition();
     if (!pointerPos) return;
+
+    // Update selection box if selecting
+    if (isSelecting) {
+      handleMouseMoveForSelection(e);
+    }
 
     // Use LIVE stage values for accurate canvas conversion during interactions
     const currentPos = stage.position();
@@ -334,13 +423,13 @@ export default function Canvas() {
           window.exitPlaceMode();
         }
       } else {
-        // Deselect any selected shape and unlock it
-        if (selectedShapeId) {
-          const selectedShape = shapes.find(s => s.id === selectedShapeId);
+        // Deselect all selected shapes and unlock them
+        selectedShapeIds.forEach(shapeId => {
+          const selectedShape = shapes.find(s => s.id === shapeId);
           if (selectedShape && selectedShape.lockedBy === user?.uid) {
-            unlockShape(selectedShapeId);
+            unlockShape(shapeId);
           }
-        }
+        });
         deselectShape();
       }
     }
@@ -354,17 +443,41 @@ export default function Canvas() {
   };
 
   /**
-   * Handle shape selection
+   * Handle shape selection (supports Shift-click for multi-select)
    */
-  const handleShapeSelect = (shapeId) => {
-    selectShape(shapeId);
+  const handleShapeSelect = (shapeId, event) => {
+    const addToSelection = event?.evt?.shiftKey || false;
+    selectShape(shapeId, addToSelection);
   };
 
   /**
-   * Handle shape change (move, resize)
+   * Handle shape change (move, resize) - supports multi-shape movement
    */
   const handleShapeChange = (updatedShape) => {
-    updateShape(updatedShape.id, updatedShape);
+    // If this is a selected shape and multiple shapes are selected, move all together
+    if (selectedShapeIds.includes(updatedShape.id) && selectedShapeIds.length > 1) {
+      // Find the original shape to calculate delta
+      const originalShape = shapes.find(s => s.id === updatedShape.id);
+      if (originalShape) {
+        const deltaX = updatedShape.x - originalShape.x;
+        const deltaY = updatedShape.y - originalShape.y;
+
+        // Update all selected shapes with the same delta
+        selectedShapeIds.forEach(shapeId => {
+          const shape = shapes.find(s => s.id === shapeId);
+          if (shape) {
+            updateShape(shapeId, {
+              ...shape,
+              x: shape.x + deltaX,
+              y: shape.y + deltaY,
+            });
+          }
+        });
+      }
+    } else {
+      // Single shape update
+      updateShape(updatedShape.id, updatedShape);
+    }
   };
 
   /**
@@ -420,11 +533,13 @@ export default function Canvas() {
           y={stagePos.y}
           scaleX={stageScale}
           scaleY={stageScale}
-          draggable={true}
+          draggable={!isSelecting} // Disable drag when selecting
           onWheel={handleWheel}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           onMouseMove={handleMouseMove}
+          onMouseDown={handleMouseDown}
+          onMouseUp={handleMouseUp}
           onClick={handleStageClick}
           onTap={handleStageClick}
           className={isDragging ? 'dragging' : ''}
@@ -445,18 +560,33 @@ export default function Canvas() {
               <Shape
                 key={shape.id}
                 shape={shape}
-                isSelected={shape.id === selectedShapeId}
+                isSelected={selectedShapeIds.includes(shape.id)}
                 canEdit={canEditShape(shape)}
                 lockedByName={shape.lockedBy ? getUserName(shape.lockedBy) : null}
                 isOwner={isOwner}
                 currentUserId={user?.uid}
-                onSelect={() => handleShapeSelect(shape.id)}
+                onSelect={(event) => handleShapeSelect(shape.id, event)}
                 onChange={handleShapeChange}
                 onLock={lockShape}
                 onUnlock={unlockShape}
                 onRightClick={handleShapeRightClick}
               />
             ))}
+
+            {/* Selection box - blue dashed rectangle */}
+            {selectionBox && (
+              <Rect
+                x={Math.min(selectionBox.startX, selectionBox.endX)}
+                y={Math.min(selectionBox.startY, selectionBox.endY)}
+                width={Math.abs(selectionBox.endX - selectionBox.startX)}
+                height={Math.abs(selectionBox.endY - selectionBox.startY)}
+                fill="rgba(0, 102, 255, 0.1)"
+                stroke="#0066FF"
+                strokeWidth={2 / stageScale} // Keep consistent width at all zoom levels
+                dash={[10 / stageScale, 5 / stageScale]}
+                listening={false}
+              />
+            )}
           </Layer>
         </Stage>
 
@@ -499,7 +629,7 @@ export default function Canvas() {
           <div>Canvas: {CANVAS_WIDTH}x{CANVAS_HEIGHT}px</div>
           <div>Shapes: {shapes.length} | Cursors: {cursors.length}</div>
           <div>Role: {isOwner ? 'Owner' : 'Collaborator'}</div>
-          {selectedShapeId && <div>Selected: {selectedShapeId}</div>}
+          {selectedShapeIds.length > 0 && <div>Selected: {selectedShapeIds.length} shape(s)</div>}
         </div>
 
         {/* Context menu */}
