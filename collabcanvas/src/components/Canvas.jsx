@@ -43,6 +43,7 @@ export default function Canvas() {
   // Selection box state (for drag-to-select)
   const [selectionBox, setSelectionBox] = useState(null); // { startX, startY, endX, endY }
   const [isSelecting, setIsSelecting] = useState(false);
+  const justCompletedSelectionRef = useRef(false); // Prevent click event from deselecting after selection
   
   // Cursor position on canvas (for debug display)
   const [cursorCanvasPos, setCursorCanvasPos] = useState({ x: 0, y: 0 });
@@ -168,6 +169,55 @@ export default function Canvas() {
   }, [selectedShapeIds, deleteShape]);
 
   /**
+   * Global mouse up handler to complete selection box even if mouse released outside Stage
+   */
+  useEffect(() => {
+    if (!isSelecting) return;
+
+    const handleGlobalMouseUp = () => {
+      setIsSelecting(false);
+
+      if (!selectionBox) {
+        return;
+      }
+
+      // Calculate selection box bounds
+      const box = {
+        x: Math.min(selectionBox.startX, selectionBox.endX),
+        y: Math.min(selectionBox.startY, selectionBox.endY),
+        width: Math.abs(selectionBox.endX - selectionBox.startX),
+        height: Math.abs(selectionBox.endY - selectionBox.startY)
+      };
+
+      // Find shapes that intersect with selection box
+      const selectedIds = shapes.filter(shape => {
+        return (
+          shape.x < box.x + box.width &&
+          shape.x + shape.width > box.x &&
+          shape.y < box.y + box.height &&
+          shape.y + shape.height > box.y
+        );
+      }).map(shape => shape.id);
+
+      if (selectedIds.length > 0) {
+        selectShape(selectedIds);
+        
+        // Set flag to prevent the subsequent click event from deselecting
+        // Only set if we actually selected something
+        justCompletedSelectionRef.current = true;
+        setTimeout(() => {
+          justCompletedSelectionRef.current = false;
+        }, 50); // Reset after 50ms (enough time for click event to fire)
+      }
+
+      setSelectionBox(null);
+    };
+
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, [isSelecting, selectionBox, shapes, selectShape]);
+
+  /**
    * Clamp viewport position to stay within canvas boundaries
    */
   const clampPosition = useCallback((pos, scale) => {
@@ -191,8 +241,7 @@ export default function Canvas() {
   }, [CANVAS_WIDTH, CANVAS_HEIGHT]);
 
   /**
-   * Handle mouse wheel for zoom
-   * Smooth zoom centered on cursor position
+   * Handle mouse wheel - Ctrl+scroll = zoom, plain scroll = pan vertical, Shift+scroll = pan horizontal
    */
   const handleWheel = useCallback((e) => {
     e.evt.preventDefault();
@@ -200,57 +249,94 @@ export default function Canvas() {
     const stage = stageRef.current;
     if (!stage) return;
 
-    const oldScale = stageScale;
-    const pointer = stage.getPointerPosition();
-    
-    // Get actual stage position (not state, which may lag)
-    const oldPos = {
-      x: stage.x(),
-      y: stage.y(),
-    };
+    const evt = e.evt;
 
-    // Smoother zoom factor (smaller increments = smoother)
-    const scaleBy = 1.05;
-    
-    // Calculate zoom direction and new scale
-    const direction = e.evt.deltaY > 0 ? -1 : 1;
-    const newScale = direction > 0 
-      ? oldScale * scaleBy 
-      : oldScale / scaleBy;
+    // Ctrl + Scroll = Zoom (centered on cursor)
+    if (evt.ctrlKey) {
+      const oldScale = stageScale;
+      const pointer = stage.getPointerPosition();
+      
+      // Get actual stage position (not state, which may lag)
+      const oldPos = {
+        x: stage.x(),
+        y: stage.y(),
+      };
 
-    // Clamp scale to min/max bounds
-    const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
-    
-    // If scale didn't change (hit limits), don't update
-    if (clampedScale === oldScale) return;
+      // Smoother zoom factor (smaller increments = smoother)
+      const scaleBy = 1.05;
+      
+      // Calculate zoom direction and new scale
+      const direction = evt.deltaY > 0 ? -1 : 1;
+      const newScale = direction > 0 
+        ? oldScale * scaleBy 
+        : oldScale / scaleBy;
 
-    // Calculate the point on the canvas that the pointer is over
-    // Using ACTUAL stage position from stage.x()/stage.y()
-    const mousePointTo = {
-      x: (pointer.x - oldPos.x) / oldScale,
-      y: (pointer.y - oldPos.y) / oldScale,
-    };
+      // Clamp scale to min/max bounds
+      const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
+      
+      // If scale didn't change (hit limits), don't update
+      if (clampedScale === oldScale) return;
 
-    // Calculate new position to keep the mouse point stationary
-    const newPos = {
-      x: pointer.x - mousePointTo.x * clampedScale,
-      y: pointer.y - mousePointTo.y * clampedScale,
-    };
+      // Calculate the point on the canvas that the pointer is over
+      const mousePointTo = {
+        x: (pointer.x - oldPos.x) / oldScale,
+        y: (pointer.y - oldPos.y) / oldScale,
+      };
 
-    // Apply position clamping to boundaries
-    const clampedPos = clampPosition(newPos, clampedScale);
+      // Calculate new position to keep the mouse point stationary
+      const newPos = {
+        x: pointer.x - mousePointTo.x * clampedScale,
+        y: pointer.y - mousePointTo.y * clampedScale,
+      };
 
-    // Update both scale and position
-    setStageScale(clampedScale);
-    setStagePos(clampedPos);
-  }, [stageScale, clampPosition]);
+      // Apply position clamping to boundaries
+      const clampedPos = clampPosition(newPos, clampedScale);
+
+      // Update both scale and position
+      setStageScale(clampedScale);
+      setStagePos(clampedPos);
+    }
+    // Shift + Scroll = Pan left/right
+    else if (evt.shiftKey) {
+      const panSpeed = 1;
+      const deltaX = evt.deltaY * panSpeed; // Use deltaY for horizontal panning
+      
+      const newPos = {
+        x: stagePos.x - deltaX,
+        y: stagePos.y
+      };
+
+      const clampedPos = clampPosition(newPos, stageScale);
+      setStagePos(clampedPos);
+    }
+    // Plain Scroll = Pan up/down
+    else {
+      const panSpeed = 1;
+      const deltaY = evt.deltaY * panSpeed;
+      
+      const newPos = {
+        x: stagePos.x,
+        y: stagePos.y - deltaY
+      };
+
+      const clampedPos = clampPosition(newPos, stageScale);
+      setStagePos(clampedPos);
+    }
+  }, [stageScale, stagePos, clampPosition]);
 
   /**
-   * Handle mouse down - start selection box or pan
+   * Handle mouse down - start selection box or middle-click pan
    */
   const handleMouseDown = (e) => {
-    // If clicked on a shape, don't start selection box
-    if (e.target !== stageRef.current) {
+    // Middle mouse button (button 1) = allow Stage to pan
+    if (e.evt.button === 1) {
+      // Enable dragging for middle mouse button
+      return; // Stage draggable will handle it
+    }
+
+    // If clicked on a shape (not Stage or Layer), don't start selection box
+    const clickedOnEmpty = e.target === stageRef.current || e.target.getClassName() === 'Layer';
+    if (!clickedOnEmpty) {
       return;
     }
 
@@ -259,18 +345,20 @@ export default function Canvas() {
       return;
     }
 
-    // Start selection box
-    const stage = stageRef.current;
-    const pointerPos = stage.getPointerPosition();
-    const canvasPos = screenToCanvas(pointerPos, stage);
+    // Left mouse button (button 0) - Start selection box
+    if (e.evt.button === 0) {
+      const stage = stageRef.current;
+      const pointerPos = stage.getPointerPosition();
+      const canvasPos = screenToCanvas(pointerPos, stage);
 
-    setSelectionBox({
-      startX: canvasPos.x,
-      startY: canvasPos.y,
-      endX: canvasPos.x,
-      endY: canvasPos.y
-    });
-    setIsSelecting(true);
+      setSelectionBox({
+        startX: canvasPos.x,
+        startY: canvasPos.y,
+        endX: canvasPos.x,
+        endY: canvasPos.y
+      });
+      setIsSelecting(true);
+    }
   };
 
   /**
@@ -291,7 +379,7 @@ export default function Canvas() {
   };
 
   /**
-   * Handle mouse up - complete selection box
+   * Handle mouse up - complete selection box (called from Stage onMouseUp)
    */
   const handleMouseUp = () => {
     if (!isSelecting) return;
@@ -320,18 +408,29 @@ export default function Canvas() {
 
     if (selectedIds.length > 0) {
       selectShape(selectedIds);
+      
+      // Set flag to prevent the subsequent click event from deselecting
+      // Only set if we actually selected something
+      justCompletedSelectionRef.current = true;
+      setTimeout(() => {
+        justCompletedSelectionRef.current = false;
+      }, 50); // Reset after 50ms (enough time for click event to fire)
     }
 
     setSelectionBox(null);
   };
 
   /**
-   * Handle drag start
+   * Handle drag start - allow middle mouse button pan
    */
   const handleDragStart = (e) => {
     // Only allow stage dragging, not shape dragging
     if (e.target === stageRef.current) {
-      setIsDragging(true);
+      // Check if middle mouse button was used (Konva doesn't expose button directly in drag)
+      // Allow dragging if not in selection mode
+      if (!isSelecting) {
+        setIsDragging(true);
+      }
     }
   };
 
@@ -423,6 +522,11 @@ export default function Canvas() {
           window.exitPlaceMode();
         }
       } else {
+        // Don't deselect if we just completed a selection box
+        if (justCompletedSelectionRef.current) {
+          return;
+        }
+        
         // Deselect all selected shapes and unlock them
         selectedShapeIds.forEach(shapeId => {
           const selectedShape = shapes.find(s => s.id === shapeId);
