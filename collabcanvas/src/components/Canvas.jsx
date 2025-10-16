@@ -45,6 +45,9 @@ export default function Canvas() {
   const [isSelecting, setIsSelecting] = useState(false);
   const justCompletedSelectionRef = useRef(false); // Prevent click event from deselecting after selection
   
+  // Clipboard state for copy/paste
+  const [clipboard, setClipboard] = useState([]);
+  
   // Cursor position on canvas (for debug display)
   const [cursorCanvasPos, setCursorCanvasPos] = useState({ x: 0, y: 0 });
 
@@ -157,18 +160,68 @@ export default function Canvas() {
   }, [CANVAS_WIDTH, CANVAS_HEIGHT, SPAWN_CANVAS_X, SPAWN_CANVAS_Y, SPAWN_ZOOM, isInitialized, calculateStagePosition]);
 
   /**
-   * Handle keyboard events (Delete key for multi-delete)
+   * Handle keyboard events (Delete, Copy, Paste, Duplicate)
    */
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Delete selected shapes
       if (e.key === 'Delete' && selectedShapeIds.length > 0) {
         deleteShape(selectedShapeIds);
+      }
+      
+      // Copy selected shapes (Ctrl+C or Cmd+C)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedShapeIds.length > 0) {
+        e.preventDefault();
+        const selectedShapes = shapes.filter(s => selectedShapeIds.includes(s.id));
+        setClipboard(selectedShapes);
+        console.log(`Copied ${selectedShapes.length} shape(s) to clipboard`);
+      }
+      
+      // Paste shapes (Ctrl+V or Cmd+V)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v' && clipboard.length > 0) {
+        e.preventDefault();
+        const pastedShapes = clipboard.map(shape => ({
+          ...shape,
+          id: `shape-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          x: shape.x + 20, // Offset by 20px
+          y: shape.y + 20,
+          lockedBy: null, // Clear lock
+        }));
+        
+        pastedShapes.forEach(shape => addShape(shape));
+        
+        // Select the newly pasted shapes
+        const newIds = pastedShapes.map(s => s.id);
+        selectShape(newIds);
+        
+        console.log(`Pasted ${pastedShapes.length} shape(s)`);
+      }
+      
+      // Duplicate shapes (Ctrl+D or Cmd+D)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedShapeIds.length > 0) {
+        e.preventDefault();
+        const selectedShapes = shapes.filter(s => selectedShapeIds.includes(s.id));
+        const duplicatedShapes = selectedShapes.map(shape => ({
+          ...shape,
+          id: `shape-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          x: shape.x + 20, // Offset by 20px
+          y: shape.y + 20,
+          lockedBy: null, // Clear lock
+        }));
+        
+        duplicatedShapes.forEach(shape => addShape(shape));
+        
+        // Select the duplicated shapes
+        const newIds = duplicatedShapes.map(s => s.id);
+        selectShape(newIds);
+        
+        console.log(`Duplicated ${duplicatedShapes.length} shape(s)`);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedShapeIds, deleteShape]);
+  }, [selectedShapeIds, shapes, clipboard, deleteShape, addShape, selectShape]);
 
   /**
    * Global mouse up handler to complete selection box even if mouse released outside Stage
