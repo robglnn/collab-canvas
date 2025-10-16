@@ -191,12 +191,28 @@ export default function Canvas() {
 
       // Find shapes that intersect with selection box
       const selectedIds = shapes.filter(shape => {
-        return (
-          shape.x < box.x + box.width &&
-          shape.x + shape.width > box.x &&
-          shape.y < box.y + box.height &&
-          shape.y + shape.height > box.y
-        );
+        if (shape.type === 'circle') {
+          // For circles, check if circle's bounding box intersects with selection box
+          const left = shape.x - shape.radius;
+          const right = shape.x + shape.radius;
+          const top = shape.y - shape.radius;
+          const bottom = shape.y + shape.radius;
+          
+          return (
+            left < box.x + box.width &&
+            right > box.x &&
+            top < box.y + box.height &&
+            bottom > box.y
+          );
+        } else {
+          // For rectangles, check standard AABB intersection
+          return (
+            shape.x < box.x + box.width &&
+            shape.x + shape.width > box.x &&
+            shape.y < box.y + box.height &&
+            shape.y + shape.height > box.y
+          );
+        }
       }).map(shape => shape.id);
 
       if (selectedIds.length > 0) {
@@ -398,12 +414,28 @@ export default function Canvas() {
 
     // Find shapes that intersect with selection box
     const selectedIds = shapes.filter(shape => {
-      return (
-        shape.x < box.x + box.width &&
-        shape.x + shape.width > box.x &&
-        shape.y < box.y + box.height &&
-        shape.y + shape.height > box.y
-      );
+      if (shape.type === 'circle') {
+        // For circles, check if circle's bounding box intersects with selection box
+        const left = shape.x - shape.radius;
+        const right = shape.x + shape.radius;
+        const top = shape.y - shape.radius;
+        const bottom = shape.y + shape.radius;
+        
+        return (
+          left < box.x + box.width &&
+          right > box.x &&
+          top < box.y + box.height &&
+          bottom > box.y
+        );
+      } else {
+        // For rectangles, check standard AABB intersection
+        return (
+          shape.x < box.x + box.width &&
+          shape.x + shape.width > box.x &&
+          shape.y < box.y + box.height &&
+          shape.y + shape.height > box.y
+        );
+      }
     }).map(shape => shape.id);
 
     if (selectedIds.length > 0) {
@@ -512,6 +544,28 @@ export default function Canvas() {
           width: 100,
           height: 100,
           rotation: 0, // Initialize rotation at 0 degrees
+        };
+
+        addShape(newShape);
+        
+        // Auto-exit place mode after placing one shape
+        setPlaceMode(null);
+        if (window.exitPlaceMode) {
+          window.exitPlaceMode();
+        }
+      } else if (placeMode === 'circle') {
+        // Place a circle at click position
+        const stage = stageRef.current;
+        const pointerPos = stage.getPointerPosition();
+        const canvasPos = screenToCanvas(pointerPos, stage);
+
+        const newShape = {
+          id: `shape-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          type: 'circle',
+          x: canvasPos.x,
+          y: canvasPos.y,
+          radius: 50, // Default radius of 50px (100px diameter)
+          rotation: 0,
         };
 
         addShape(newShape);

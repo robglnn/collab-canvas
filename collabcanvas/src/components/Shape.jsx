@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, memo } from 'react';
-import { Rect, Transformer, Text, Group } from 'react-konva';
+import { Rect, Circle, Transformer, Text, Group } from 'react-konva';
 
 /**
  * Shape component - Renders a single shape on the canvas
@@ -124,18 +124,30 @@ const Shape = memo(function Shape({
     const scaleY = node.scaleY();
     const rotation = node.rotation();
 
-    // Reset scale and update width/height instead
+    // Reset scale
     node.scaleX(1);
     node.scaleY(1);
 
-    onChange({
-      ...shape,
-      x: node.x(),
-      y: node.y(),
-      width: Math.max(5, node.width() * scaleX),
-      height: Math.max(5, node.height() * scaleY),
-      rotation: rotation, // Add rotation to shape data
-    });
+    if (shape.type === 'circle') {
+      // For circles, update radius (use average of scaleX and scaleY)
+      onChange({
+        ...shape,
+        x: node.x(),
+        y: node.y(),
+        radius: Math.max(5, shape.radius * ((scaleX + scaleY) / 2)),
+        rotation: rotation,
+      });
+    } else {
+      // For rectangles, update width/height
+      onChange({
+        ...shape,
+        x: node.x(),
+        y: node.y(),
+        width: Math.max(5, node.width() * scaleX),
+        height: Math.max(5, node.height() * scaleY),
+        rotation: rotation,
+      });
+    }
   };
 
   // Determine stroke color based on lock state
@@ -153,45 +165,57 @@ const Shape = memo(function Shape({
     strokeWidth = 2;
   }
 
+  // Common props for all shapes
+  const commonProps = {
+    ref: shapeRef,
+    id: shape.id,
+    x: shape.x,
+    y: shape.y,
+    rotation: shape.rotation || 0,
+    fill: "#000000", // All shapes are black for MVP
+    stroke: strokeColor,
+    strokeWidth: strokeWidth,
+    draggable: canEdit,
+    onClick: handleClick,
+    onTap: handleClick,
+    onContextMenu: handleRightClick,
+    onDragStart: handleDragStart,
+    onDragEnd: handleDragEnd,
+    onTransformEnd: handleTransformEnd,
+    onMouseEnter: () => {
+      if (isLockedByOther) {
+        setShowLockLabel(true);
+      }
+    },
+    onMouseLeave: () => {
+      setShowLockLabel(false);
+    },
+    shadowColor: isSelected ? '#667eea' : 'transparent',
+    shadowBlur: isSelected ? 10 : 0,
+    shadowOpacity: 0.5,
+  };
+
   return (
     <>
       <Group>
-        <Rect
-          ref={shapeRef}
-          id={shape.id}
-          x={shape.x}
-          y={shape.y}
-          width={shape.width}
-          height={shape.height}
-          rotation={shape.rotation || 0} // Add rotation support (default 0)
-          fill="#000000" // All rectangles are black for MVP
-          stroke={strokeColor}
-          strokeWidth={strokeWidth}
-          draggable={canEdit}
-          onClick={handleClick}
-          onTap={handleClick}
-          onContextMenu={handleRightClick}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          onTransformEnd={handleTransformEnd}
-          onMouseEnter={() => {
-            if (isLockedByOther) {
-              setShowLockLabel(true);
-            }
-          }}
-          onMouseLeave={() => {
-            setShowLockLabel(false);
-          }}
-          shadowColor={isSelected ? '#667eea' : 'transparent'}
-          shadowBlur={isSelected ? 10 : 0}
-          shadowOpacity={0.5}
-        />
+        {shape.type === 'circle' ? (
+          <Circle
+            {...commonProps}
+            radius={shape.radius}
+          />
+        ) : (
+          <Rect
+            {...commonProps}
+            width={shape.width}
+            height={shape.height}
+          />
+        )}
         
         {/* Lock indicator label */}
         {(isLockedByOther && showLockLabel) && (
           <Text
             x={shape.x}
-            y={shape.y - 25}
+            y={shape.type === 'circle' ? shape.y - shape.radius - 25 : shape.y - 25}
             text={`🔒 ${lockedByName || 'Locked'}`}
             fontSize={14}
             fill="#ef4444"
@@ -208,22 +232,18 @@ const Shape = memo(function Shape({
           ref={transformerRef}
           boundBoxFunc={(oldBox, newBox) => {
             // Limit minimum size
-            if (newBox.width < 5 || newBox.height < 5) {
+            const minSize = shape.type === 'circle' ? 10 : 5;
+            if (newBox.width < minSize || newBox.height < minSize) {
               return oldBox;
             }
             return newBox;
           }}
-          enabledAnchors={[
-            'top-left',
-            'top-center',
-            'top-right',
-            'middle-left',
-            'middle-right',
-            'bottom-left',
-            'bottom-center',
-            'bottom-right',
-          ]}
-          keepRatio={false} // Allow free-form resizing (any aspect ratio)
+          enabledAnchors={
+            shape.type === 'circle'
+              ? ['top-left', 'top-right', 'bottom-left', 'bottom-right'] // Only corners for circles
+              : ['top-left', 'top-center', 'top-right', 'middle-left', 'middle-right', 'bottom-left', 'bottom-center', 'bottom-right']
+          }
+          keepRatio={shape.type === 'circle'} // Keep circular shape for circles
           rotateEnabled={true} // Enable rotation (0-360 degrees)
         />
       )}
