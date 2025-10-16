@@ -69,7 +69,22 @@ const Shape = memo(function Shape({
       console.log('Shape is locked by another user');
       return;
     }
-    onSelect();
+    onSelect(e);
+  };
+
+  /**
+   * Handle double-click for text editing
+   */
+  const handleDblClick = (e) => {
+    if (shape.type === 'text' && canEdit) {
+      const newText = prompt('Edit text:', shape.text || '');
+      if (newText !== null) {
+        onChange({
+          ...shape,
+          text: newText || 'Double-click to edit',
+        });
+      }
+    }
   };
 
   /**
@@ -137,6 +152,15 @@ const Shape = memo(function Shape({
         radius: Math.max(5, shape.radius * ((scaleX + scaleY) / 2)),
         rotation: rotation,
       });
+    } else if (shape.type === 'text') {
+      // For text, only update width (height is automatic based on text content)
+      onChange({
+        ...shape,
+        x: node.x(),
+        y: node.y(),
+        width: Math.max(20, node.width() * scaleX),
+        rotation: 0, // Don't allow rotation for text in basic version
+      });
     } else {
       // For rectangles, update width/height
       onChange({
@@ -178,6 +202,7 @@ const Shape = memo(function Shape({
     draggable: canEdit,
     onClick: handleClick,
     onTap: handleClick,
+    onDblClick: handleDblClick, // Double-click to edit text
     onContextMenu: handleRightClick,
     onDragStart: handleDragStart,
     onDragEnd: handleDragEnd,
@@ -202,6 +227,15 @@ const Shape = memo(function Shape({
           <Circle
             {...commonProps}
             radius={shape.radius}
+          />
+        ) : shape.type === 'text' ? (
+          <Text
+            {...commonProps}
+            text={shape.text || 'Double-click to edit'}
+            fontSize={shape.fontSize || 24}
+            fontFamily={shape.fontFamily || 'Arial'}
+            width={shape.width || 200}
+            align={shape.align || 'left'}
           />
         ) : (
           <Rect
@@ -232,7 +266,7 @@ const Shape = memo(function Shape({
           ref={transformerRef}
           boundBoxFunc={(oldBox, newBox) => {
             // Limit minimum size
-            const minSize = shape.type === 'circle' ? 10 : 5;
+            const minSize = shape.type === 'circle' ? 10 : shape.type === 'text' ? 20 : 5;
             if (newBox.width < minSize || newBox.height < minSize) {
               return oldBox;
             }
@@ -241,10 +275,12 @@ const Shape = memo(function Shape({
           enabledAnchors={
             shape.type === 'circle'
               ? ['top-left', 'top-right', 'bottom-left', 'bottom-right'] // Only corners for circles
+              : shape.type === 'text'
+              ? ['middle-left', 'middle-right'] // Only horizontal resize for text
               : ['top-left', 'top-center', 'top-right', 'middle-left', 'middle-right', 'bottom-left', 'bottom-center', 'bottom-right']
           }
           keepRatio={shape.type === 'circle'} // Keep circular shape for circles
-          rotateEnabled={true} // Enable rotation (0-360 degrees)
+          rotateEnabled={shape.type !== 'text'} // Disable rotation for text
         />
       )}
     </>

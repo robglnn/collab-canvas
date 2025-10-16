@@ -34,6 +34,17 @@ export default function Toolbar({ onCreateShape }) {
   };
 
   /**
+   * Handle text button click
+   * Enters "place mode" where user clicks on canvas to place text
+   */
+  const handleTextClick = () => {
+    setIsPlaceMode(true);
+    setActiveShape('text');
+    onCreateShape('text');
+    console.log('Place mode activated: text');
+  };
+
+  /**
    * Exit place mode (called from Canvas component after placing shape)
    */
   const exitPlaceMode = () => {
@@ -73,6 +84,17 @@ export default function Toolbar({ onCreateShape }) {
             <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2"/>
           </svg>
           <span>Circle</span>
+        </button>
+
+        <button
+          className={`toolbar-btn ${isPlaceMode && activeShape === 'text' ? 'active' : ''}`}
+          onClick={handleTextClick}
+          title="Click to place text (double-click to edit)"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <text x="12" y="16" fontSize="14" textAnchor="middle" fill="currentColor" fontWeight="bold">T</text>
+          </svg>
+          <span>Text</span>
         </button>
       </div>
 

@@ -577,6 +577,31 @@ export default function Canvas() {
         if (window.exitPlaceMode) {
           window.exitPlaceMode();
         }
+      } else if (placeMode === 'text') {
+        // Place text at click position
+        const stage = stageRef.current;
+        const pointerPos = stage.getPointerPosition();
+        const canvasPos = screenToCanvas(pointerPos, stage);
+
+        const newShape = {
+          id: `shape-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          type: 'text',
+          x: canvasPos.x,
+          y: canvasPos.y,
+          text: 'Double-click to edit',
+          fontSize: 24,
+          fontFamily: 'Arial',
+          width: 200,
+          rotation: 0,
+        };
+
+        addShape(newShape);
+        
+        // Auto-exit place mode after placing one shape
+        setPlaceMode(null);
+        if (window.exitPlaceMode) {
+          window.exitPlaceMode();
+        }
       } else {
         // Don't deselect if we just completed a selection box
         if (justCompletedSelectionRef.current) {
