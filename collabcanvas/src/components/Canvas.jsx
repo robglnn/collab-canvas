@@ -217,11 +217,47 @@ export default function Canvas() {
         
         console.log(`Duplicated ${duplicatedShapes.length} shape(s)`);
       }
+      
+      // Arrow key movement (1px or 10px with Shift)
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && selectedShapeIds.length > 0) {
+        e.preventDefault(); // Prevent page scrolling
+        
+        const nudgeAmount = e.shiftKey ? 10 : 1; // 10px with Shift, 1px without
+        let deltaX = 0;
+        let deltaY = 0;
+        
+        switch (e.key) {
+          case 'ArrowUp':
+            deltaY = -nudgeAmount;
+            break;
+          case 'ArrowDown':
+            deltaY = nudgeAmount;
+            break;
+          case 'ArrowLeft':
+            deltaX = -nudgeAmount;
+            break;
+          case 'ArrowRight':
+            deltaX = nudgeAmount;
+            break;
+        }
+        
+        // Move all selected shapes
+        selectedShapeIds.forEach(shapeId => {
+          const shape = shapes.find(s => s.id === shapeId);
+          if (shape) {
+            updateShape(shapeId, {
+              ...shape,
+              x: shape.x + deltaX,
+              y: shape.y + deltaY,
+            });
+          }
+        });
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedShapeIds, shapes, clipboard, deleteShape, addShape, selectShape]);
+  }, [selectedShapeIds, shapes, clipboard, deleteShape, addShape, selectShape, updateShape]);
 
   /**
    * Global mouse up handler to complete selection box even if mouse released outside Stage
