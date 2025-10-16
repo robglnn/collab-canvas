@@ -329,12 +329,13 @@ Canvas Rendering (Konva.js)
 - 🎯 Google profile photos shown next to cursors
 
 ### Explicitly Out of Scope for MVP
-- ❌ Undo/Redo functionality
-- ❌ Multi-select (click and drag to select multiple shapes)
-- ❌ Shape customization (colors, borders, opacity)
-- ❌ Additional shape types beyond rectangles
+- ❌ Undo/Redo functionality (added in PR #21)
+- ❌ Multi-select (added in PR #18)
+- ❌ Shape customization (added in PRs #13-17)
+- ❌ Additional shape types beyond rectangles (added in PRs #15-17)
 - ❌ Mobile/touch device support
 - ❌ Owner transfer/reassignment
+- ❌ AI Canvas Agent (added in PRs #26-29)
 
 ---
 

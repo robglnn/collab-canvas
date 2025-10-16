@@ -1428,19 +1428,22 @@ collabcanvas/
 
 ## Quick Reference: PR Order
 
-### MVP (Completed)
-1. ✅ Project Setup & Firebase Configuration
-2. ✅ Google OAuth Authentication
-3. ✅ Basic Canvas with Pan & Zoom
-4. ✅ Shape Creation & Local Manipulation
-5. ✅ Firestore Integration & Real-Time Sync
-6. ✅ Cursor Synchronization
-7. ✅ User Presence System
-8. ✅ Owner Controls - Shape Locking
-9. ✅ Owner Controls - Kick User
-10. ✅ State Persistence & Reconnection
-11. ✅ Polish, Performance & Bug Fixes
-12. ✅ Final Deployment & Testing
+### MVP (Completed) ✅
+1. ✅ Project Setup & Firebase Configuration - COMPLETE
+2. ✅ Google OAuth Authentication - COMPLETE
+3. ✅ Basic Canvas with Pan & Zoom - COMPLETE
+4. ✅ Shape Creation & Local Manipulation - COMPLETE
+5. ✅ Firestore Integration & Real-Time Sync - COMPLETE
+6. ✅ Cursor Synchronization - COMPLETE
+7. ✅ User Presence System - COMPLETE
+8. ✅ Owner Controls - Shape Locking - COMPLETE
+9. ✅ Owner Controls - Kick User - COMPLETE
+10. ✅ State Persistence & Reconnection - COMPLETE
+11. ✅ Polish, Performance & Bug Fixes - COMPLETE
+12. ✅ Final Deployment & Testing - COMPLETE
+
+**Status:** MVP fully functional and deployed
+**Performance:** Sub-100ms sync, 60 FPS, 5+ concurrent users supported
 
 ### Feature Additions (PRs 13-25)
 13. ⬜ Advanced Color System (4-5 hours)
@@ -1458,6 +1461,28 @@ collabcanvas/
 25. ⬜ Connection Indicator (2-3 hours)
 
 **Total Estimated Effort for PRs 13-25:** 50-65 hours
+
+### Essential Features for AI Agent (PRs 15-21) - PRIORITY
+15. ⬜ Circle Tool (2 hours) - Required for AI variety
+17. ⬜ Text Tool - Basic Only (2 hours) - Required for complex commands  
+18. ⬜ Multi-Select with Selection Box (5 hours) - Required for layouts
+18.5 ⬜ Resize & Rotate Transforms (1 hour) - Required for rubric
+19. ⬜ Copy/Paste Shapes (2 hours) - UX improvement
+20. ⬜ Arrow Key Movement (1 hour) - Tier 1 feature
+21. ⬜ Undo/Redo System (7 hours) - Critical Tier 1 feature
+
+**Total Effort PRs 15-21:** 20 hours
+
+### AI Canvas Agent (PRs 26-29)
+26. ⬜ Core AI Infrastructure & Basic Commands (8 hours)
+27. ⬜ Advanced Commands & Layouts (5 hours)
+28. ⬜ Queue System & Multi-User Coordination (4 hours)
+29. ⬜ Polish, Optimization & Integration (2 hours)
+
+**Total Effort PRs 26-29:** 19 hours
+
+**GRAND TOTAL FOR COMPLETION:** 40 hours (19 essential + 19 AI + 2 buffer)
+**PROJECTED RUBRIC SCORE:** 97/100 (A Grade)
 
 ---
 
@@ -1486,3 +1511,470 @@ collabcanvas/
 - Deploy early and often to catch Firebase config issues
 - Throttle cursor updates or you'll hit Firestore rate limits
 - Test state persistence in every PR after #5
+
+---
+
+## PR #26: Core AI Infrastructure & Basic Commands
+
+**Branch:** `feature/ai-agent-core`
+
+**Goal:** Set up OpenAI integration, AI command bar UI, and basic creation/manipulation commands
+
+### Tasks:
+
+- [ ] **26.1: Set Up OpenAI Configuration**
+  - Install OpenAI SDK: `npm install openai`
+  - Add VITE_OPENAI_API_KEY to `.env.local`
+  - Update `.env.example` with OpenAI key placeholder
+  - Create OpenAI client configuration
+  - Test API connection with simple prompt
+  - **Files Created:**
+    - `src/lib/openai.js`
+  - **Files Modified:**
+    - `.env.local`
+    - `.env.example`
+    - `package.json`
+
+- [ ] **26.2: Create AI Command Bar Component**
+  - Build collapsible command input UI
+  - Add 200 character limit validation
+  - Add character counter (shows at 150+ chars)
+  - Implement submit button with states (default, loading, success, disabled)
+  - Add collapse/expand toggle
+  - Position above Rectangle tool in toolbar
+  - **Files Created:**
+    - `src/components/AICommandBar.jsx`
+    - `src/components/AICommandBar.css`
+  - **Files Modified:**
+    - `src/App.jsx` (add AICommandBar to toolbar)
+
+- [ ] **26.3: Create AI Banner Component**
+  - Build banner for status/error messages
+  - Support 4 types: error (red), warning (yellow), info (blue), success (green)
+  - Auto-hide after 3 seconds (configurable)
+  - Add close button
+  - Position at top of screen below top bar
+  - **Files Created:**
+    - `src/components/AIBanner.jsx`
+    - `src/components/AIBanner.css`
+  - **Files Modified:**
+    - `src/App.jsx` (add AIBanner)
+
+- [ ] **26.4: Define Canvas Function Schemas**
+  - Define OpenAI function schemas for all canvas operations
+  - Include: createShape, moveShape, resizeShape, rotateShape, changeShapeColor, deleteShape
+  - Include: updateText, selectShapesByProperty, deselectAll
+  - Include: arrangeHorizontal, arrangeVertical, arrangeGrid, alignShapes
+  - Include: getCanvasInfo (query operations)
+  - **Files Created:**
+    - `src/lib/aiTools.js`
+
+- [ ] **26.5: Build Function Executor**
+  - Implement execution logic for each function schema
+  - Add permission checks (shape locks, ownership)
+  - Handle errors gracefully (locked shapes, not found, etc.)
+  - Return execution results (created/modified shape IDs, errors)
+  - Generate summary messages
+  - **Files Created:**
+    - `src/lib/aiExecutor.js`
+
+- [ ] **26.6: Create Basic AI Hook**
+  - Hook to manage AI command submission
+  - Send command + canvas context to OpenAI
+  - Parse function calls from response
+  - Execute functions via aiExecutor
+  - Update UI with results
+  - Handle errors and display in banner
+  - **Files Created:**
+    - `src/hooks/useAI.js`
+
+- [ ] **26.7: Integrate with Canvas Context**
+  - Pass shapes, viewport, selectedShapeIds to AI
+  - Implement canModifyShape permission check
+  - Connect AI hook to AICommandBar component
+  - Update Canvas component to support AI-generated shapes
+  - **Files Modified:**
+    - `src/hooks/useAI.js`
+    - `src/components/Canvas.jsx`
+    - `src/components/AICommandBar.jsx`
+
+- [ ] **26.8: Add AI Attribution Fields to Shapes**
+  - Add `createdByAI: boolean` field
+  - Add `aiCommandId: string | null` field
+  - Add `updatedBy: string` field
+  - Add `updatedByAI: boolean` field
+  - Update shape creation/update logic
+  - **Files Modified:**
+    - `src/lib/firestoreService.js`
+    - `src/hooks/useCanvas.js`
+
+- [ ] **26.9: Test Basic Commands**
+  - Test creation commands (rectangle, circle, text, line)
+  - Test manipulation commands (move, resize, rotate, color)
+  - Test selection commands (select by property, deselect)
+  - Test error handling (invalid commands, locked shapes)
+  - Verify shapes sync to all users
+  - **Files Modified:**
+    - Bug fixes as needed
+
+---
+
+## PR #27: Advanced Commands & Layouts
+
+**Branch:** `feature/ai-advanced-commands`
+
+**Goal:** Implement layout commands (grid, align, distribute) and complex multi-step operations
+
+### Tasks:
+
+- [ ] **27.1: Implement Arrange Horizontal**
+  - Function to arrange shapes in a row with spacing
+  - Handle dynamic spacing based on shape count
+  - Support custom starting position or use first shape
+  - Update all shapes in Firestore with new positions
+  - **Files Modified:**
+    - `src/lib/aiExecutor.js`
+
+- [ ] **27.2: Implement Arrange Vertical**
+  - Function to arrange shapes in a column with spacing
+  - Handle dynamic spacing based on shape count
+  - Support custom starting position or use first shape
+  - Update all shapes in Firestore
+  - **Files Modified:**
+    - `src/lib/aiExecutor.js`
+
+- [ ] **27.3: Implement Arrange Grid**
+  - Function to arrange shapes in a grid (rows × cols)
+  - Calculate grid positions with spacing
+  - Support custom starting position or use viewport center
+  - Handle overflow (more shapes than grid cells)
+  - **Files Modified:**
+    - `src/lib/aiExecutor.js`
+
+- [ ] **27.4: Implement Align Shapes**
+  - Support 6 alignment types: left, right, top, bottom, center-horizontal, center-vertical
+  - Calculate alignment based on first shape or group bounds
+  - Update all shapes while maintaining relative spacing
+  - **Files Modified:**
+    - `src/lib/aiExecutor.js`
+
+- [ ] **27.5: Implement Query Commands**
+  - getCanvasInfo with query types: count, colors, types, summary
+  - Return formatted text responses
+  - Display in success banner
+  - **Files Modified:**
+    - `src/lib/aiExecutor.js`
+
+- [ ] **27.6: Build Complex Command Templates**
+  - Login Form: Username field, password field, submit button (6 shapes)
+  - Nav Bar: Background + 4 menu text items (5 shapes)
+  - Card Layout: Title, image placeholder, description (3 shapes)
+  - Button: Rectangle + centered text (2 shapes)
+  - **Files Modified:**
+    - `src/lib/aiExecutor.js` (add template helper functions)
+
+- [ ] **27.7: Improve AI System Prompt**
+  - Add examples of complex commands
+  - Provide shape creation guidelines
+  - Include layout best practices
+  - Suggest reasonable defaults for ambiguous commands
+  - **Files Modified:**
+    - `src/lib/openai.js`
+
+- [ ] **27.8: Test Advanced Commands**
+  - Test arrange horizontal, vertical, grid
+  - Test all 6 alignment types
+  - Test query commands (count, colors, types)
+  - Test complex commands (login form, nav bar, card)
+  - Verify multi-step operations complete properly
+  - **Files Modified:**
+    - Bug fixes as needed
+
+---
+
+## PR #28: Queue System & Multi-User Coordination
+
+**Branch:** `feature/ai-queue`
+
+**Goal:** Implement command queue, rate limiting, and multi-user coordination
+
+### Tasks:
+
+- [ ] **28.1: Create Firestore Collections for AI**
+  - Create `/canvases/main/aiCommands/` collection
+  - Create `/canvases/main/aiRateLimits/` collection
+  - Define data models for commands and rate limits
+  - **Files Modified:**
+    - `firestore.rules` (add security rules)
+
+- [ ] **28.2: Update Firestore Security Rules**
+  - Allow authenticated users to create AI commands
+  - Allow users to read all commands (for queue position)
+  - Allow users to update only their own rate limits
+  - Prevent deletion by non-owners
+  - **Files Modified:**
+    - `firestore.rules`
+
+- [ ] **28.3: Create Rate Limit Hook**
+  - Check user rate limit (5 seconds between commands)
+  - Check canvas rate limit (300 commands per minute)
+  - Record command submission timestamps
+  - Start cooldown timer after submission
+  - Display countdown in UI
+  - **Files Created:**
+    - `src/hooks/useAIRateLimit.js`
+
+- [ ] **28.4: Create Queue Hook**
+  - Subscribe to AI commands collection
+  - Track queue position for current user
+  - Process commands in order (FIFO)
+  - Implement 2-second timeout per command
+  - Delete completed commands after 5 seconds
+  - **Files Created:**
+    - `src/hooks/useAIQueue.js`
+
+- [ ] **28.5: Integrate Rate Limiting with Command Bar**
+  - Disable submit during cooldown period
+  - Show timer: "Wait 3s..." with countdown
+  - Display error banner if rate limit hit
+  - Yellow background on input during cooldown
+  - **Files Modified:**
+    - `src/components/AICommandBar.jsx`
+    - `src/hooks/useAI.js`
+
+- [ ] **28.6: Integrate Queue with AI Execution**
+  - Add command to queue instead of executing immediately
+  - Show queue position banner: "Your prompt is #2 in queue"
+  - Show processing banner: "Finishing previous agent prompt"
+  - Execute when command reaches front of queue
+  - Handle timeout (cancel if >2 seconds)
+  - **Files Modified:**
+    - `src/hooks/useAI.js`
+    - `src/components/AICommandBar.jsx`
+
+- [ ] **28.7: Add Queue Full Handling**
+  - Limit queue to 10 pending commands
+  - Show error if queue is full
+  - Suggest user tries again shortly
+  - **Files Modified:**
+    - `src/hooks/useAIQueue.js`
+
+- [ ] **28.8: Test Multi-User Scenarios**
+  - Open 3+ browser windows
+  - Submit commands from multiple users simultaneously
+  - Verify queue processes in correct order
+  - Test rate limiting per user and per canvas
+  - Verify queue full error shows correctly
+  - Test timeout handling (artificially delay command)
+  - **Files Modified:**
+    - Bug fixes as needed
+
+---
+
+## PR #29: Polish, Optimization & Complex Commands
+
+**Branch:** `feature/ai-polish`
+
+**Goal:** Integrate with Undo/Redo, optimize performance, refine error handling, add complex command support
+
+### Tasks:
+
+- [ ] **29.1: Integrate with Undo/Redo System**
+  - Save canvas snapshot before AI command execution
+  - Add AI commands to undo history
+  - Support undoing entire AI operation (all shapes created/modified)
+  - Test undo with complex commands (login form, etc.)
+  - **Files Modified:**
+    - `src/hooks/useAI.js`
+    - `src/hooks/useUndoRedo.js`
+
+- [ ] **29.2: Optimize OpenAI API Calls**
+  - Reduce system prompt size (remove unnecessary context)
+  - Use GPT-4-turbo for faster responses
+  - Set temperature to 0.2 for consistency
+  - Implement response caching for common commands
+  - **Files Modified:**
+    - `src/lib/openai.js`
+
+- [ ] **29.3: Improve Error Messages**
+  - Provide specific error messages for common failures
+  - Suggest corrections for ambiguous commands
+  - Show partial success messages (e.g., "Created 3 of 5 shapes, 2 locked")
+  - Add error codes for debugging
+  - **Files Modified:**
+    - `src/lib/aiExecutor.js`
+    - `src/components/AIBanner.jsx`
+
+- [ ] **29.4: Add Visual Feedback for AI Actions**
+  - Optional: Subtle green flash on created shapes
+  - Optional: Animate multi-step operations
+  - Show shape count in success banner: "Created 3 shapes"
+  - Add checkmark icon to success banner
+  - **Files Modified:**
+    - `src/components/Canvas.jsx`
+    - `src/components/AIBanner.jsx`
+
+- [ ] **29.5: Refine Complex Command Templates**
+  - Improve login form layout (better positioning, styling)
+  - Improve nav bar spacing and alignment
+  - Add card layout with proper proportions
+  - Add dashboard template (grid of cards)
+  - Add sidebar template (menu items)
+  - **Files Modified:**
+    - `src/lib/aiExecutor.js`
+    - `src/lib/openai.js` (update system prompt with examples)
+
+- [ ] **29.6: Add Input Validation & Sanitization**
+  - Strip HTML/scripts from user input
+  - Validate hex color codes
+  - Validate coordinate ranges (0-5000)
+  - Validate size constraints (min/max)
+  - **Files Modified:**
+    - `src/components/AICommandBar.jsx`
+    - `src/lib/aiExecutor.js`
+
+- [ ] **29.7: Performance Testing & Optimization**
+  - Test with 50+ shapes on canvas
+  - Measure average command latency
+  - Optimize Firestore batch writes
+  - Test with slow network (throttle in DevTools)
+  - Ensure <2 second response time
+  - **Files Modified:**
+    - Performance optimizations as needed
+
+- [ ] **29.8: Comprehensive Multi-User Testing**
+  - Test all 6 command types with multiple users
+  - Test complex commands from different users
+  - Verify shapes sync correctly
+  - Test rate limiting with 5+ users
+  - Test queue with 10+ commands
+  - Test undo/redo with AI commands
+  - Test error scenarios (locked shapes, invalid commands)
+  - **Files Modified:**
+    - Bug fixes as needed
+
+- [ ] **29.9: Documentation & Deployment**
+  - Update README with AI agent instructions
+  - Document all supported commands
+  - Add OpenAI API key setup guide
+  - Deploy to Firebase Hosting
+  - Test deployed version with multiple users
+  - Monitor OpenAI API usage
+  - **Files Modified:**
+    - `README.md`
+    - `docs/AI_AGENT_PRD.md` (mark as completed)
+
+- [ ] **29.10: Final AI Agent Checklist Verification**
+  - ✅ Users can submit natural language commands
+  - ✅ AI creates shapes that sync to all users
+  - ✅ Supports 6+ distinct command types (creation, manipulation, layout, selection, complex, query)
+  - ✅ Commands complete within 2 seconds
+  - ✅ Rate limiting works (5s per user, 300/min per canvas)
+  - ✅ Queue prevents conflicts and processes in order
+  - ✅ Respects shape locks and permissions
+  - ✅ Integrates with Undo/Redo system
+  - ✅ Shows clear, concise error messages
+  - ✅ Multi-user AI works without conflicts
+  - ✅ UI provides immediate feedback (loading, success, errors)
+  - ✅ Complex commands work (login form, nav bar, etc.)
+  - ✅ Performance meets targets (<2s latency)
+  - ✅ Deployed and accessible
+
+---
+
+## AI Agent Testing Checklist
+
+### Single User Testing
+- [ ] **Creation Commands:**
+  - [ ] "Create a red circle at 100, 200"
+  - [ ] "Add a text that says 'Hello World'"
+  - [ ] "Make a 200x300 blue rectangle"
+  - [ ] "Create 5 squares in a row"
+
+- [ ] **Manipulation Commands:**
+  - [ ] "Move the blue rectangle to the center"
+  - [ ] "Resize the circle to 200px"
+  - [ ] "Rotate the text 45 degrees"
+  - [ ] "Change the red square to purple"
+
+- [ ] **Layout Commands:**
+  - [ ] "Arrange these shapes in a horizontal row"
+  - [ ] "Create a grid of 3x3 squares"
+  - [ ] "Align all rectangles to the left"
+  - [ ] "Space these elements evenly"
+
+- [ ] **Selection Commands:**
+  - [ ] "Select all red shapes"
+  - [ ] "Select circles"
+  - [ ] "Deselect everything"
+
+- [ ] **Complex Commands:**
+  - [ ] "Create a login form"
+  - [ ] "Build a navigation bar with 4 items"
+  - [ ] "Make a card layout"
+
+- [ ] **Query Commands:**
+  - [ ] "How many shapes are there?"
+  - [ ] "What colors are being used?"
+  - [ ] "List all text elements"
+
+### Multi-User Testing (2+ browsers)
+- [ ] Both users submit commands at same time
+- [ ] Verify queue processes in order
+- [ ] Both users see AI-generated shapes
+- [ ] Test rate limiting (submit 3 commands rapidly)
+- [ ] Test canvas rate limit (10+ users submit simultaneously)
+- [ ] Test locked shape interaction (one user locks, other uses AI)
+
+### Error Handling Testing
+- [ ] Submit empty command
+- [ ] Submit 201+ character command
+- [ ] Submit ambiguous command ("move it")
+- [ ] Submit impossible command ("move shape that doesn't exist")
+- [ ] Try to modify locked shape with AI
+- [ ] Submit during rate limit cooldown
+- [ ] Submit when queue is full (11th command)
+- [ ] Test timeout (modify OpenAI to take >2s)
+
+### Performance Testing
+- [ ] Measure latency for simple commands (<2s)
+- [ ] Measure latency for complex commands (<2s per step)
+- [ ] Test with 50+ shapes on canvas
+- [ ] Test with slow network (throttle in DevTools)
+- [ ] Monitor OpenAI API response times
+
+### Integration Testing
+- [ ] Undo AI command (Ctrl+Z)
+- [ ] Redo AI command (Ctrl+Shift+Z)
+- [ ] Delete AI-created shape manually
+- [ ] Move AI-created shape manually
+- [ ] Use AI on manually-created shapes
+- [ ] Color picker applies to AI-created shapes
+- [ ] Multi-select works with AI-created shapes
+
+---
+
+## AI Agent Development Tips
+
+**OpenAI Best Practices:**
+- Use GPT-4 for better function calling accuracy
+- Keep system prompt concise but informative
+- Use low temperature (0.2) for consistent results
+- Implement timeout to prevent long waits
+- Cache common commands to reduce API costs
+
+**Testing Strategy:**
+- Test all 6 command types thoroughly
+- Use multiple browsers for multi-user testing
+- Test edge cases (empty input, locked shapes, rate limits)
+- Monitor OpenAI API usage and costs
+- Test with slow network to ensure graceful degradation
+
+**Common Pitfalls to Avoid:**
+- Don't expose API key in client code
+- Always validate and sanitize user input
+- Handle OpenAI API errors gracefully (timeout, rate limit, etc.)
+- Test queue thoroughly to prevent race conditions
+- Ensure AI respects shape locks (permission checks)
+- Don't forget to integrate with Undo/Redo
+- Test rate limiting thoroughly to prevent abuse

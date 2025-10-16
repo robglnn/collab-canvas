@@ -1,0 +1,43 @@
+Ignore node_modules directory (common in JavaScript/Node.js projects)
+
+node_modules/
+
+Ignore build output directories
+
+dist/ build/ out/
+
+Ignore dependency lock files
+
+package-lock.json yarn.lock pnpm-lock.yaml
+
+Ignore environment files
+
+.env .env.local .env.development .env.production
+
+Ignore log files
+
+*.log logs/
+
+Ignore temporary files
+
+*.tmp *.temp *.swp
+
+Ignore OS-specific files
+
+.DS_Store Thumbs.db
+
+Ignore IDE-specific files
+
+.vscode/ .idea/ *.code-workspace
+
+Ignore compiled Python files
+
+*.pyc pycache/
+
+Ignore coverage reports
+
+coverage/ *.lcov
+
+Ignore test output
+
+test-results/ junit.xml
