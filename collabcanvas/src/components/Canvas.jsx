@@ -5,12 +5,15 @@ import { useCursors } from '../hooks/useCursors';
 import { usePresence } from '../hooks/usePresence';
 import { useAuth } from '../hooks/useAuth';
 import { useHistory } from '../hooks/useHistory';
+import { useAI } from '../hooks/useAI';
 import { screenToCanvas } from '../lib/canvasUtils';
 import Toolbar from './Toolbar';
 import Shape from './Shape';
 import UserCursor from './UserCursor';
 import ContextMenu from './ContextMenu';
 import DisconnectBanner from './DisconnectBanner';
+import AICommandBar from './AICommandBar';
+import { AIBannerManager } from './AIBanner';
 import './Canvas.css';
 
 /**
@@ -88,6 +91,49 @@ export default function Canvas() {
 
   // History hook for undo/redo
   const { canUndo, canRedo, takeSnapshot, undo, redo, clearHistory } = useHistory();
+
+  // AI hook - pass canvas context
+  const aiContext = useMemo(() => ({
+    shapes,
+    selectedShapeIds,
+    stagePos,
+    stageScale,
+    stageRef,
+    addShape,
+    updateShape,
+    deleteShape,
+    selectShape,
+    deselectShape,
+    user
+  }), [shapes, selectedShapeIds, stagePos, stageScale, addShape, updateShape, deleteShape, selectShape, deselectShape, user]);
+
+  const { submitCommand, isProcessing, lastResult, error, clearResult } = useAI(aiContext);
+
+  // AI Banner state
+  const [aiBanners, setAiBanners] = useState([]);
+
+  // Handle AI command submission
+  const handleAISubmit = useCallback(async (command) => {
+    const result = await submitCommand(command);
+    
+    // Show result in banner
+    if (result) {
+      const bannerType = result.success ? 'success' : 'error';
+      const bannerId = Date.now().toString();
+      
+      setAiBanners(prev => [...prev, {
+        id: bannerId,
+        message: result.message,
+        type: bannerType,
+        duration: 3000
+      }]);
+    }
+  }, [submitCommand]);
+
+  // Handle banner close
+  const handleBannerClose = useCallback((bannerId) => {
+    setAiBanners(prev => prev.filter(b => b.id !== bannerId));
+  }, []);
 
   // Canvas boundaries and zoom limits
   const CANVAS_WIDTH = 5000;
@@ -867,7 +913,14 @@ export default function Canvas() {
 
   return (
     <div className="canvas-container">
-      <Toolbar onCreateShape={handleCreateShape} />
+      <Toolbar onCreateShape={handleCreateShape}>
+        <AICommandBar 
+          onSubmit={handleAISubmit} 
+          isProcessing={isProcessing}
+          showSuccess={lastResult?.success && !isProcessing}
+        />
+      </Toolbar>
+      <AIBannerManager banners={aiBanners} onBannerClose={handleBannerClose} />
       <DisconnectBanner show={showDisconnectBanner} />
       
       <div className={`canvas-workspace ${placeMode ? 'place-mode' : ''}`}>

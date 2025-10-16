@@ -3,11 +3,13 @@ import './Toolbar.css';
 
 /**
  * Toolbar component with shape creation buttons
- * Currently supports: Rectangle, Circle
+ * Currently supports: Rectangle, Circle, Text
+ * Also includes AI Command Bar as children
  * 
  * @param {Function} onCreateShape - Callback when shape creation is requested
+ * @param {ReactNode} children - Optional children (e.g., AI Command Bar)
  */
-export default function Toolbar({ onCreateShape }) {
+export default function Toolbar({ onCreateShape, children }) {
   const [isPlaceMode, setIsPlaceMode] = useState(false);
   const [activeShape, setActiveShape] = useState(null);
 
@@ -61,6 +63,13 @@ export default function Toolbar({ onCreateShape }) {
 
   return (
     <div className="toolbar">
+      {/* AI Command Bar (passed as children) */}
+      {children && (
+        <div className="toolbar-section">
+          {children}
+        </div>
+      )}
+      
       <div className="toolbar-section">
         <h3 className="toolbar-title">Tools</h3>
         
