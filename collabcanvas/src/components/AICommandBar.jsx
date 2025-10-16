@@ -8,15 +8,18 @@ import './AICommandBar.css';
  * Features:
  * - 200 character limit
  * - Character counter (shows at 150+)
- * - Submit button states: default, loading, success, disabled
+ * - Submit button states: default, loading, success, disabled, cooldown
+ * - Cooldown display (5 second rate limit)
  * - Collapse/expand toggle
  * - Enter key to submit
  * 
  * @param {Function} onSubmit - Callback when command is submitted
  * @param {boolean} isProcessing - Whether AI is currently processing
  * @param {boolean} showSuccess - Whether to show success checkmark
+ * @param {number} cooldownRemaining - Seconds remaining in cooldown
+ * @param {boolean} isOnCooldown - Whether user is in cooldown period
  */
-export default function AICommandBar({ onSubmit, isProcessing = false, showSuccess = false }) {
+export default function AICommandBar({ onSubmit, isProcessing = false, showSuccess = false, cooldownRemaining = 0, isOnCooldown = false }) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [command, setCommand] = useState('');
   const [showCharCount, setShowCharCount] = useState(false);
@@ -78,7 +81,7 @@ export default function AICommandBar({ onSubmit, isProcessing = false, showSucce
     }
   }, [showSuccess]);
 
-  const isSubmitDisabled = !command.trim() || isProcessing;
+  const isSubmitDisabled = !command.trim() || isProcessing || isOnCooldown;
 
   // Determine button class based on state
   let buttonClass = 'ai-command-submit';
@@ -86,6 +89,8 @@ export default function AICommandBar({ onSubmit, isProcessing = false, showSucce
     buttonClass += ' loading';
   } else if (showSuccess) {
     buttonClass += ' success';
+  } else if (isOnCooldown) {
+    buttonClass += ' cooldown';
   } else if (isSubmitDisabled) {
     buttonClass += ' disabled';
   }
@@ -132,12 +137,19 @@ export default function AICommandBar({ onSubmit, isProcessing = false, showSucce
             className={buttonClass}
             onClick={handleSubmit}
             disabled={isSubmitDisabled}
-            title={isProcessing ? 'Processing...' : showSuccess ? 'Success!' : 'Submit command'}
+            title={
+              isProcessing ? 'Processing...' : 
+              showSuccess ? 'Success!' : 
+              isOnCooldown ? `Cooldown: ${cooldownRemaining}s` : 
+              'Submit command'
+            }
           >
             {isProcessing ? (
               <span className="spinner">⏳</span>
             ) : showSuccess ? (
               <span className="checkmark">✓</span>
+            ) : isOnCooldown ? (
+              <span className="cooldown-timer">{cooldownRemaining}s</span>
             ) : (
               'Submit'
             )}

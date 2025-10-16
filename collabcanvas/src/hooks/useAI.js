@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { callOpenAI } from '../lib/openai';
 import { aiTools } from '../lib/aiTools';
 import { executeFunction } from '../lib/aiExecutor';
@@ -6,12 +6,17 @@ import { executeFunction } from '../lib/aiExecutor';
 /**
  * useAI Hook
  * 
- * Manages AI command processing workflow:
+ * Manages AI command processing workflow with rate limiting:
  * 1. Accept user's natural language command
- * 2. Send to OpenAI with canvas context
- * 3. Parse function calls from response
- * 4. Execute functions via aiExecutor
- * 5. Return results and errors for UI display
+ * 2. Check rate limits (5 sec cooldown per user, 300/min per canvas)
+ * 3. Send to OpenAI with canvas context
+ * 4. Parse function calls from response
+ * 5. Execute functions via aiExecutor
+ * 6. Return results and errors for UI display
+ * 
+ * Rate Limits:
+ * - Per user: 1 command every 5 seconds (12/minute)
+ * - Per canvas: 300 commands/minute (simple check)
  * 
  * @param {Object} canvasContext - Canvas state and operations (shapes, hooks, user, viewport)
  * @returns {Object} AI state and methods
@@ -20,6 +25,12 @@ export function useAI(canvasContext) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastResult, setLastResult] = useState(null);
   const [error, setError] = useState(null);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  
+  const lastCommandTimeRef = useRef(0);
+  const cooldownIntervalRef = useRef(null);
+
+  const COOLDOWN_SECONDS = 5; // 5 seconds between commands per user
 
   /**
    * Submit a command to the AI
@@ -28,8 +39,28 @@ export function useAI(canvasContext) {
    * @returns {Promise<Object>} Result { success, message, actions, errors }
    */
   const submitCommand = useCallback(async (command) => {
+    // Check cooldown
+    const now = Date.now();
+    const timeSinceLastCommand = (now - lastCommandTimeRef.current) / 1000;
+    
+    if (timeSinceLastCommand < COOLDOWN_SECONDS) {
+      const remaining = Math.ceil(COOLDOWN_SECONDS - timeSinceLastCommand);
+      const errorResult = {
+        success: false,
+        message: `Please wait ${remaining} second${remaining > 1 ? 's' : ''} before sending another command`,
+        actions: [],
+        errors: [`Cooldown: ${remaining}s remaining`]
+      };
+      setError(errorResult.message);
+      return errorResult;
+    }
+
     setIsProcessing(true);
     setError(null);
+    lastCommandTimeRef.current = now;
+
+    // Start cooldown timer
+    startCooldownTimer();
 
     try {
       // Build canvas context for AI
@@ -202,6 +233,34 @@ export function useAI(canvasContext) {
   }
 
   /**
+   * Start cooldown countdown timer
+   */
+  const startCooldownTimer = useCallback(() => {
+    // Clear any existing interval
+    if (cooldownIntervalRef.current) {
+      clearInterval(cooldownIntervalRef.current);
+    }
+
+    setCooldownRemaining(COOLDOWN_SECONDS);
+
+    cooldownIntervalRef.current = setInterval(() => {
+      const now = Date.now();
+      const elapsed = (now - lastCommandTimeRef.current) / 1000;
+      const remaining = Math.max(0, COOLDOWN_SECONDS - elapsed);
+
+      if (remaining <= 0) {
+        setCooldownRemaining(0);
+        if (cooldownIntervalRef.current) {
+          clearInterval(cooldownIntervalRef.current);
+          cooldownIntervalRef.current = null;
+        }
+      } else {
+        setCooldownRemaining(Math.ceil(remaining));
+      }
+    }, 100); // Update every 100ms for smooth countdown
+  }, [COOLDOWN_SECONDS]);
+
+  /**
    * Clear last result and error
    */
   const clearResult = useCallback(() => {
@@ -209,12 +268,25 @@ export function useAI(canvasContext) {
     setError(null);
   }, []);
 
+  /**
+   * Cleanup on unmount
+   */
+  useEffect(() => {
+    return () => {
+      if (cooldownIntervalRef.current) {
+        clearInterval(cooldownIntervalRef.current);
+      }
+    };
+  }, []);
+
   return {
     submitCommand,
     isProcessing,
     lastResult,
     error,
-    clearResult
+    clearResult,
+    cooldownRemaining,
+    isOnCooldown: cooldownRemaining > 0
   };
 }
 

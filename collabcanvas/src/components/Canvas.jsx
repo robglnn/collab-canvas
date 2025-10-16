@@ -107,7 +107,7 @@ export default function Canvas() {
     user
   }), [shapes, selectedShapeIds, stagePos, stageScale, addShape, updateShape, deleteShape, selectShape, deselectShape, user]);
 
-  const { submitCommand, isProcessing, lastResult, error, clearResult } = useAI(aiContext);
+  const { submitCommand, isProcessing, lastResult, error, clearResult, cooldownRemaining, isOnCooldown } = useAI(aiContext);
 
   // AI Banner state
   const [aiBanners, setAiBanners] = useState([]);
@@ -918,6 +918,8 @@ export default function Canvas() {
           onSubmit={handleAISubmit} 
           isProcessing={isProcessing}
           showSuccess={lastResult?.success && !isProcessing}
+          cooldownRemaining={cooldownRemaining}
+          isOnCooldown={isOnCooldown}
         />
       </Toolbar>
       <AIBannerManager banners={aiBanners} onBannerClose={handleBannerClose} />
