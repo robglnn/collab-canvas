@@ -433,6 +433,57 @@ export const aiTools = [
         required: ['infoType']
       }
     }
+  },
+
+  // ====== COMPLEX UI TEMPLATES ======
+  {
+    type: 'function',
+    function: {
+      name: 'createUITemplate',
+      description: 'Create complex UI components from templates (login form, navigation bar, card layout, button)',
+      parameters: {
+        type: 'object',
+        properties: {
+          templateType: {
+            type: 'string',
+            enum: ['loginForm', 'navBar', 'card', 'button'],
+            description: 'Type of UI template to create'
+          },
+          x: {
+            type: 'number',
+            description: 'X position for template (default: viewport center)'
+          },
+          y: {
+            type: 'number',
+            description: 'Y position for template (default: viewport center)'
+          },
+          customization: {
+            type: 'object',
+            description: 'Optional customizations (labels, sizes, etc.)',
+            properties: {
+              buttonText: {
+                type: 'string',
+                description: 'Text for button template'
+              },
+              menuItems: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Menu item labels for nav bar (default: ["Home", "About", "Services", "Contact"])'
+              },
+              title: {
+                type: 'string',
+                description: 'Title text for card template'
+              },
+              description: {
+                type: 'string',
+                description: 'Description text for card template'
+              }
+            }
+          }
+        },
+        required: ['templateType']
+      }
+    }
   }
 ];
 

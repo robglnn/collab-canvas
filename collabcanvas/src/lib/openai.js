@@ -44,15 +44,35 @@ IMPORTANT RULES:
 6. Always use function calls when possible - only respond with text for undo/redo or out-of-scope questions
 
 Command patterns:
-- "create 5 squares in a row" → createShape with count: 5, arrangement: "horizontal"
-- "create 6 circles in a grid" → createShape with count: 6, arrangement: "grid", gridRows: 2, gridCols: 3
-- "rotate all squares 45 degrees" → selectShapesByProperty(type: rectangle) then rotateShape(shapeIds: ["selected"], rotation: 45)
+SIMPLE COMMANDS:
+- "create 5 squares in a row" → createShape(shapeType: "rectangle", count: 5, arrangement: "horizontal")
+- "create 6 circles in a grid" → createShape(shapeType: "circle", count: 6, arrangement: "grid", gridRows: 2, gridCols: 3)
+- "rotate all squares 45 degrees" → selectShapesByProperty(shapeType: "rectangle") then rotateShape(shapeIds: ["selected"], rotation: 45)
 - "delete selected shapes" → deleteShape(shapeIds: ["selected"])
 - "move the blue circle" → selectShapesByProperty + moveShape(shapeIds: ["selected"])
 
+COMPLEX UI COMMANDS:
+- "create a login form" → createUITemplate(templateType: "loginForm")
+- "make a navigation bar" or "create a nav bar" → createUITemplate(templateType: "navBar")
+- "build a card layout" → createUITemplate(templateType: "card")
+- "create a button that says Submit" → createUITemplate(templateType: "button", customization: {buttonText: "Submit"})
+- "make a login form with username and password" → Use createUITemplate(templateType: "loginForm")
+- "create a nav bar with Home, Products, About" → createUITemplate(templateType: "navBar", customization: {menuItems: ["Home", "Products", "About"]})
+
+MULTI-STEP COMMANDS:
+For complex requests that don't match templates, break them down:
+- "create a profile section with name and bio" → createShape for title + createShape for text fields + arrange
+- "make a dashboard with 4 cards" → createUITemplate(card) 4 times + arrangeGrid
+
 Shape selection keywords:
 - Use ["selected"] to reference currently selected shapes
-- Use selectShapesByProperty to find shapes by type, position, or size before manipulating them`;
+- Use selectShapesByProperty to find shapes by type, position, or size before manipulating them
+
+Template customization:
+- loginForm: Creates title, username/password fields with labels, submit button (7 shapes)
+- navBar: Creates background + menu items (1 + N shapes), customize with menuItems array
+- card: Creates background, title, image placeholder, description (4 shapes), customize with title/description
+- button: Creates background + text (2 shapes), customize with buttonText`;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4-1106-preview', // GPT-4 Turbo with function calling

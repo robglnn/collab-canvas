@@ -57,6 +57,9 @@ export async function executeFunction(functionName, args, context) {
       case 'getCanvasInfo':
         return await getCanvasInfo(args, context);
       
+      case 'createUITemplate':
+        return await createUITemplate(args, context);
+      
       default:
         return {
           success: false,
@@ -895,6 +898,252 @@ async function getCanvasInfo(args, context) {
     message,
     data
   };
+}
+
+// ====== COMPLEX UI TEMPLATES ======
+
+async function createUITemplate(args, context) {
+  const { templateType, x, y, customization = {} } = args;
+  const { addShape, viewport, user } = context;
+
+  const defaultX = x !== undefined ? x : viewport?.centerX || 2500;
+  const defaultY = y !== undefined ? y : viewport?.centerY || 2500;
+
+  const createdShapes = [];
+  const commandId = Date.now().toString();
+
+  try {
+    switch (templateType) {
+      case 'loginForm':
+        // Login Form: Title, Username field (rect + text), Password field (rect + text), Submit button (rect + text)
+        // Total: 7 shapes arranged vertically
+        
+        // Title
+        createdShapes.push(await createTemplateShape({
+          type: 'text',
+          x: defaultX,
+          y: defaultY,
+          text: 'Login',
+          fontSize: 32,
+          width: 300
+        }, commandId, user, addShape));
+
+        // Username label
+        createdShapes.push(await createTemplateShape({
+          type: 'text',
+          x: defaultX,
+          y: defaultY + 60,
+          text: 'Username',
+          fontSize: 16,
+          width: 300
+        }, commandId, user, addShape));
+
+        // Username input field
+        createdShapes.push(await createTemplateShape({
+          type: 'rectangle',
+          x: defaultX,
+          y: defaultY + 90,
+          width: 300,
+          height: 40
+        }, commandId, user, addShape));
+
+        // Password label
+        createdShapes.push(await createTemplateShape({
+          type: 'text',
+          x: defaultX,
+          y: defaultY + 150,
+          text: 'Password',
+          fontSize: 16,
+          width: 300
+        }, commandId, user, addShape));
+
+        // Password input field
+        createdShapes.push(await createTemplateShape({
+          type: 'rectangle',
+          x: defaultX,
+          y: defaultY + 180,
+          width: 300,
+          height: 40
+        }, commandId, user, addShape));
+
+        // Submit button background
+        createdShapes.push(await createTemplateShape({
+          type: 'rectangle',
+          x: defaultX + 75,
+          y: defaultY + 240,
+          width: 150,
+          height: 45
+        }, commandId, user, addShape));
+
+        // Submit button text
+        createdShapes.push(await createTemplateShape({
+          type: 'text',
+          x: defaultX + 75,
+          y: defaultY + 250,
+          text: 'Submit',
+          fontSize: 18,
+          width: 150
+        }, commandId, user, addShape));
+
+        break;
+
+      case 'navBar':
+        // Nav Bar: Background rectangle + menu items (text)
+        const menuItems = customization.menuItems || ['Home', 'About', 'Services', 'Contact'];
+        
+        // Background
+        createdShapes.push(await createTemplateShape({
+          type: 'rectangle',
+          x: defaultX,
+          y: defaultY,
+          width: 800,
+          height: 60
+        }, commandId, user, addShape));
+
+        // Menu items spaced evenly
+        const itemSpacing = 800 / (menuItems.length + 1);
+        for (let i = 0; i < menuItems.length; i++) {
+          createdShapes.push(await createTemplateShape({
+            type: 'text',
+            x: defaultX + itemSpacing * (i + 1) - 40,
+            y: defaultY + 18,
+            text: menuItems[i],
+            fontSize: 18,
+            width: 80
+          }, commandId, user, addShape));
+        }
+
+        break;
+
+      case 'card':
+        // Card: Title, Image placeholder (rectangle), Description
+        const title = customization.title || 'Card Title';
+        const description = customization.description || 'Card description goes here';
+
+        // Card background
+        createdShapes.push(await createTemplateShape({
+          type: 'rectangle',
+          x: defaultX,
+          y: defaultY,
+          width: 300,
+          height: 400
+        }, commandId, user, addShape));
+
+        // Title
+        createdShapes.push(await createTemplateShape({
+          type: 'text',
+          x: defaultX + 20,
+          y: defaultY + 20,
+          text: title,
+          fontSize: 24,
+          width: 260
+        }, commandId, user, addShape));
+
+        // Image placeholder
+        createdShapes.push(await createTemplateShape({
+          type: 'rectangle',
+          x: defaultX + 20,
+          y: defaultY + 70,
+          width: 260,
+          height: 200
+        }, commandId, user, addShape));
+
+        // Description
+        createdShapes.push(await createTemplateShape({
+          type: 'text',
+          x: defaultX + 20,
+          y: defaultY + 290,
+          text: description,
+          fontSize: 14,
+          width: 260
+        }, commandId, user, addShape));
+
+        break;
+
+      case 'button':
+        // Button: Rectangle + centered text
+        const buttonText = customization.buttonText || 'Click Me';
+
+        // Button background
+        createdShapes.push(await createTemplateShape({
+          type: 'rectangle',
+          x: defaultX,
+          y: defaultY,
+          width: 150,
+          height: 50
+        }, commandId, user, addShape));
+
+        // Button text
+        createdShapes.push(await createTemplateShape({
+          type: 'text',
+          x: defaultX,
+          y: defaultY + 12,
+          text: buttonText,
+          fontSize: 18,
+          width: 150
+        }, commandId, user, addShape));
+
+        break;
+
+      default:
+        return {
+          success: false,
+          message: `Unknown template type: ${templateType}`,
+          errors: [`Template ${templateType} not found`]
+        };
+    }
+
+    return {
+      success: true,
+      message: `Created ${templateType} template with ${createdShapes.length} shapes`,
+      data: {
+        shapeIds: createdShapes.map(s => s.id),
+        shapes: createdShapes,
+        count: createdShapes.length,
+        templateType
+      }
+    };
+
+  } catch (error) {
+    console.error('Error creating UI template:', error);
+    return {
+      success: false,
+      message: `Failed to create ${templateType} template: ${error.message}`,
+      errors: [error.message]
+    };
+  }
+}
+
+/**
+ * Helper function to create a shape for templates
+ */
+async function createTemplateShape(config, commandId, user, addShape) {
+  const shape = {
+    id: generateShapeId(),
+    type: config.type,
+    x: config.x,
+    y: config.y,
+    rotation: 0,
+    createdByAI: true,
+    aiCommandId: commandId,
+    createdBy: user?.uid
+  };
+
+  if (config.type === 'rectangle') {
+    shape.width = config.width;
+    shape.height = config.height;
+  } else if (config.type === 'circle') {
+    shape.radius = config.radius;
+  } else if (config.type === 'text') {
+    shape.text = config.text;
+    shape.fontSize = config.fontSize;
+    shape.width = config.width;
+    shape.fontFamily = 'Arial';
+    shape.align = 'left';
+  }
+
+  await addShape(shape);
+  return shape;
 }
 
 export default { executeFunction };
