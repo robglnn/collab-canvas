@@ -4,6 +4,7 @@ import { useCanvas } from '../hooks/useCanvas';
 import { useCursors } from '../hooks/useCursors';
 import { usePresence } from '../hooks/usePresence';
 import { useAuth } from '../hooks/useAuth';
+import { useHistory } from '../hooks/useHistory';
 import { screenToCanvas } from '../lib/canvasUtils';
 import Toolbar from './Toolbar';
 import Shape from './Shape';
@@ -84,6 +85,9 @@ export default function Canvas() {
   
   // Cursors hook - pass online user IDs to filter cursors
   const { cursors, updateCursorPosition, removeCursor } = useCursors(onlineUserIds);
+
+  // History hook for undo/redo
+  const { canUndo, canRedo, takeSnapshot, undo, redo, clearHistory } = useHistory();
 
   // Canvas boundaries and zoom limits
   const CANVAS_WIDTH = 5000;
@@ -166,6 +170,7 @@ export default function Canvas() {
     const handleKeyDown = (e) => {
       // Delete selected shapes
       if (e.key === 'Delete' && selectedShapeIds.length > 0) {
+        takeSnapshot(shapes); // Take snapshot before deleting
         deleteShape(selectedShapeIds);
       }
       
@@ -180,6 +185,7 @@ export default function Canvas() {
       // Paste shapes (Ctrl+V or Cmd+V)
       if ((e.ctrlKey || e.metaKey) && e.key === 'v' && clipboard.length > 0) {
         e.preventDefault();
+        takeSnapshot(shapes); // Take snapshot before pasting
         const pastedShapes = clipboard.map(shape => ({
           ...shape,
           id: `shape-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -200,6 +206,7 @@ export default function Canvas() {
       // Duplicate shapes (Ctrl+D or Cmd+D)
       if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedShapeIds.length > 0) {
         e.preventDefault();
+        takeSnapshot(shapes); // Take snapshot before duplicating
         const selectedShapes = shapes.filter(s => selectedShapeIds.includes(s.id));
         const duplicatedShapes = selectedShapes.map(shape => ({
           ...shape,
@@ -218,9 +225,43 @@ export default function Canvas() {
         console.log(`Duplicated ${duplicatedShapes.length} shape(s)`);
       }
       
+      // Undo (Ctrl+Z or Cmd+Z)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (canUndo) {
+          const previousState = undo(shapes);
+          if (previousState) {
+            // Apply previous state to Firestore
+            // First, clear current shapes
+            shapes.forEach(shape => deleteShape(shape.id));
+            // Then add previous shapes
+            previousState.forEach(shape => addShape(shape));
+            console.log('Undo applied');
+          }
+        }
+      }
+      
+      // Redo (Ctrl+Shift+Z or Cmd+Shift+Z, or Ctrl+Y)
+      if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && e.shiftKey) || 
+          ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y')) {
+        e.preventDefault();
+        if (canRedo) {
+          const nextState = redo(shapes);
+          if (nextState) {
+            // Apply next state to Firestore
+            // First, clear current shapes
+            shapes.forEach(shape => deleteShape(shape.id));
+            // Then add next shapes
+            nextState.forEach(shape => addShape(shape));
+            console.log('Redo applied');
+          }
+        }
+      }
+      
       // Arrow key movement (1px or 10px with Shift)
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && selectedShapeIds.length > 0) {
         e.preventDefault(); // Prevent page scrolling
+        takeSnapshot(shapes); // Take snapshot before moving
         
         const nudgeAmount = e.shiftKey ? 10 : 1; // 10px with Shift, 1px without
         let deltaX = 0;
@@ -257,7 +298,22 @@ export default function Canvas() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedShapeIds, shapes, clipboard, deleteShape, addShape, selectShape, updateShape]);
+  }, [selectedShapeIds, shapes, clipboard, deleteShape, addShape, selectShape, updateShape, canUndo, canRedo, undo, redo]);
+
+  /**
+   * Track previous shapes for snapshot comparison
+   * Only take snapshots when shapes actually change from user actions
+   */
+  const previousShapesRef = useRef([]);
+  const dragSnapshotTakenRef = useRef(false);
+  
+  useEffect(() => {
+    // Take initial snapshot when canvas first loads
+    if (previousShapesRef.current.length === 0 && shapes.length > 0) {
+      takeSnapshot(shapes);
+      previousShapesRef.current = shapes;
+    }
+  }, [shapes, takeSnapshot]);
 
   /**
    * Global mouse up handler to complete selection box even if mouse released outside Stage
@@ -360,48 +416,48 @@ export default function Canvas() {
 
     // Ctrl + Scroll = Zoom (centered on cursor)
     if (evt.ctrlKey) {
-      const oldScale = stageScale;
-      const pointer = stage.getPointerPosition();
-      
-      // Get actual stage position (not state, which may lag)
-      const oldPos = {
-        x: stage.x(),
-        y: stage.y(),
-      };
+    const oldScale = stageScale;
+    const pointer = stage.getPointerPosition();
+    
+    // Get actual stage position (not state, which may lag)
+    const oldPos = {
+      x: stage.x(),
+      y: stage.y(),
+    };
 
-      // Smoother zoom factor (smaller increments = smoother)
-      const scaleBy = 1.05;
-      
-      // Calculate zoom direction and new scale
+    // Smoother zoom factor (smaller increments = smoother)
+    const scaleBy = 1.05;
+    
+    // Calculate zoom direction and new scale
       const direction = evt.deltaY > 0 ? -1 : 1;
-      const newScale = direction > 0 
-        ? oldScale * scaleBy 
-        : oldScale / scaleBy;
+    const newScale = direction > 0 
+      ? oldScale * scaleBy 
+      : oldScale / scaleBy;
 
-      // Clamp scale to min/max bounds
-      const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
-      
-      // If scale didn't change (hit limits), don't update
-      if (clampedScale === oldScale) return;
+    // Clamp scale to min/max bounds
+    const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
+    
+    // If scale didn't change (hit limits), don't update
+    if (clampedScale === oldScale) return;
 
-      // Calculate the point on the canvas that the pointer is over
-      const mousePointTo = {
-        x: (pointer.x - oldPos.x) / oldScale,
-        y: (pointer.y - oldPos.y) / oldScale,
-      };
+    // Calculate the point on the canvas that the pointer is over
+    const mousePointTo = {
+      x: (pointer.x - oldPos.x) / oldScale,
+      y: (pointer.y - oldPos.y) / oldScale,
+    };
 
-      // Calculate new position to keep the mouse point stationary
-      const newPos = {
-        x: pointer.x - mousePointTo.x * clampedScale,
-        y: pointer.y - mousePointTo.y * clampedScale,
-      };
+    // Calculate new position to keep the mouse point stationary
+    const newPos = {
+      x: pointer.x - mousePointTo.x * clampedScale,
+      y: pointer.y - mousePointTo.y * clampedScale,
+    };
 
-      // Apply position clamping to boundaries
-      const clampedPos = clampPosition(newPos, clampedScale);
+    // Apply position clamping to boundaries
+    const clampedPos = clampPosition(newPos, clampedScale);
 
-      // Update both scale and position
-      setStageScale(clampedScale);
-      setStagePos(clampedPos);
+    // Update both scale and position
+    setStageScale(clampedScale);
+    setStagePos(clampedPos);
     }
     // Shift + Scroll = Pan left/right
     else if (evt.shiftKey) {
@@ -552,7 +608,7 @@ export default function Canvas() {
       // Check if middle mouse button was used (Konva doesn't expose button directly in drag)
       // Allow dragging if not in selection mode
       if (!isSelecting) {
-        setIsDragging(true);
+      setIsDragging(true);
       }
     }
   };
@@ -637,6 +693,7 @@ export default function Canvas() {
           rotation: 0, // Initialize rotation at 0 degrees
         };
 
+        takeSnapshot(shapes); // Take snapshot before adding
         addShape(newShape);
         
         // Auto-exit place mode after placing one shape
@@ -659,6 +716,7 @@ export default function Canvas() {
           rotation: 0,
         };
 
+        takeSnapshot(shapes); // Take snapshot before adding
         addShape(newShape);
         
         // Auto-exit place mode after placing one shape
@@ -684,6 +742,7 @@ export default function Canvas() {
           rotation: 0,
         };
 
+        takeSnapshot(shapes); // Take snapshot before adding
         addShape(newShape);
         
         // Auto-exit place mode after placing one shape
@@ -728,6 +787,12 @@ export default function Canvas() {
    * Handle shape change (move, resize) - supports multi-shape movement
    */
   const handleShapeChange = (updatedShape) => {
+    // Take snapshot before first change in a drag/transform session
+    if (!dragSnapshotTakenRef.current) {
+      takeSnapshot(shapes);
+      dragSnapshotTakenRef.current = true;
+    }
+    
     // If this is a selected shape and multiple shapes are selected, move all together
     if (selectedShapeIds.includes(updatedShape.id) && selectedShapeIds.length > 1) {
       // Find the original shape to calculate delta
@@ -753,6 +818,13 @@ export default function Canvas() {
       updateShape(updatedShape.id, updatedShape);
     }
   };
+
+  /**
+   * Handle drag/transform end - reset snapshot flag
+   */
+  const handleDragEndComplete = useCallback(() => {
+    dragSnapshotTakenRef.current = false;
+  }, []);
 
   /**
    * Handle shape right-click
@@ -841,6 +913,7 @@ export default function Canvas() {
                 currentUserId={user?.uid}
                 onSelect={(event) => handleShapeSelect(shape.id, event)}
                 onChange={handleShapeChange}
+                onDragEndComplete={handleDragEndComplete}
                 onLock={lockShape}
                 onUnlock={unlockShape}
                 onRightClick={handleShapeRightClick}

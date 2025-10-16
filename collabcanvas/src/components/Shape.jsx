@@ -27,6 +27,7 @@ const Shape = memo(function Shape({
   currentUserId,
   onSelect, 
   onChange,
+  onDragEndComplete,
   onLock,
   onUnlock,
   onRightClick,
@@ -126,6 +127,11 @@ const Shape = memo(function Shape({
       x: e.target.x(),
       y: e.target.y(),
     });
+    
+    // Notify parent that drag is complete
+    if (onDragEndComplete) {
+      onDragEndComplete();
+    }
   };
 
   /**
@@ -171,6 +177,11 @@ const Shape = memo(function Shape({
         height: Math.max(5, node.height() * scaleY),
         rotation: rotation,
       });
+    }
+    
+    // Notify parent that transform is complete
+    if (onDragEndComplete) {
+      onDragEndComplete();
     }
   };
 
