@@ -138,8 +138,11 @@ export function useCursors(onlineUserIds = []) {
     );
     
     setCursors(filteredCursors);
-    console.log(`Filtered cursors: ${filteredCursors.length} online out of ${allCursors.length} total`);
-  }, [allCursors, onlineUserIds]);
+    // Only log when cursor count actually changes
+    if (filteredCursors.length !== cursors.length) {
+      console.log(`Filtered cursors: ${filteredCursors.length} online out of ${allCursors.length} total`);
+    }
+  }, [allCursors, onlineUserIds, cursors.length]);
 
   // Clean up stale cursors on mount (remove cursors from offline users)
   useEffect(() => {

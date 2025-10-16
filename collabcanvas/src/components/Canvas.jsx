@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Stage, Layer, Rect } from 'react-konva';
 import { useCanvas } from '../hooks/useCanvas';
 import { useCursors } from '../hooks/useCursors';
@@ -74,8 +74,10 @@ export default function Canvas() {
   // Presence hook - to get user names for lock labels
   const { users } = usePresence(ownerId);
   
-  // Get online user IDs from presence data
-  const onlineUserIds = users.filter(u => u.online).map(u => u.userId);
+  // Get online user IDs from presence data (memoized to prevent infinite loops)
+  const onlineUserIds = useMemo(() => {
+    return users.filter(u => u.online).map(u => u.userId);
+  }, [users]);
   
   // Cursors hook - pass online user IDs to filter cursors
   const { cursors, updateCursorPosition, removeCursor } = useCursors(onlineUserIds);
