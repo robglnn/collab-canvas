@@ -281,6 +281,13 @@ const Shape = memo(function Shape({
           }
           keepRatio={shape.type === 'circle'} // Keep circular shape for circles
           rotateEnabled={shape.type !== 'text'} // Disable rotation for text
+          rotationSnaps={[0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240, 255, 270, 285, 300, 315, 330, 345]} // 15° snapping when Shift is held
+          anchorSize={8} // Larger anchors for easier grabbing
+          anchorStroke="#667eea" // Match selection color
+          anchorFill="#ffffff" // White fill for visibility
+          anchorCornerRadius={2} // Slightly rounded anchors
+          borderStroke="#667eea" // Match selection color
+          borderStrokeWidth={2} // Thicker border for visibility
         />
       )}
     </>
