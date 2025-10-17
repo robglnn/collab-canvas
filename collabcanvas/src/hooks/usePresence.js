@@ -1,21 +1,20 @@
 import { useState, useEffect } from 'react';
 import {
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  onSnapshot,
-  serverTimestamp,
-} from 'firebase/firestore';
-import { db } from '../lib/firebase';
+  ref,
+  onValue,
+  set,
+  onDisconnect,
+  off,
+} from 'firebase/database';
+import { database } from '../lib/firebase';
 import { useAuth } from './useAuth';
-import { kickUser as kickUserFromFirestore } from '../lib/firestoreService';
 
 const CANVAS_ID = 'main';
 
 /**
- * Custom hook for user presence tracking
+ * Custom hook for user presence tracking via RTDB
  * Manages current user's online status and subscribes to all users' presence
+ * Uses Firebase Realtime Database with automatic disconnect detection
  * 
  * @param {string} canvasOwnerId - The ID of the canvas owner
  * @returns {Object} Presence state
@@ -30,18 +29,21 @@ export function usePresence(canvasOwnerId) {
   const [isOwner, setIsOwner] = useState(false);
   const [wasKicked, setWasKicked] = useState(false);
 
-  // Set current user as online when component mounts
+  // Set current user as online when component mounts with auto-disconnect
   useEffect(() => {
     if (!user) return;
 
     const setUserOnline = async () => {
       try {
-        const presenceRef = doc(db, 'canvases', CANVAS_ID, 'presence', user.uid);
+        const presenceRef = ref(database, `presence/${CANVAS_ID}/${user.uid}`);
         
         // Check if user was kicked before setting online
-        const presenceDoc = await getDoc(presenceRef);
-        if (presenceDoc.exists() && presenceDoc.data().kicked) {
-          console.log('User was kicked, not setting online');
+        const snapshot = await new Promise((resolve, reject) => {
+          onValue(presenceRef, resolve, reject, { onlyOnce: true });
+        });
+        
+        if (snapshot.exists() && snapshot.val().kicked) {
+          console.log('[RTDB] User was kicked, not setting online');
           setWasKicked(true);
           return;
         }
@@ -50,91 +52,86 @@ export function usePresence(canvasOwnerId) {
         const role = canvasOwnerId === user.uid ? 'owner' : 'collaborator';
         setIsOwner(role === 'owner');
 
-        // Use merge: true to preserve kicked field if it exists
-        await setDoc(presenceRef, {
+        const now = Date.now();
+        const presenceData = {
           userId: user.uid,
           userName: user.displayName || 'Anonymous',
           userEmail: user.email,
           photoURL: user.photoURL || null,
           role,
           online: true,
-          kicked: false, // Explicitly set kicked to false when user joins
-          lastSeen: serverTimestamp(),
-        }, { merge: true });
+          kicked: false,
+          lastSeen: now,
+        };
 
-        console.log('User presence set to online:', user.displayName);
+        // Set up auto-disconnect: mark user offline when connection drops
+        await onDisconnect(presenceRef).set({
+          ...presenceData,
+          online: false,
+          lastSeen: now,
+        });
+
+        // Set user online
+        await set(presenceRef, presenceData);
+
+        console.log('[RTDB] User presence set to online with auto-disconnect:', user.displayName);
       } catch (error) {
-        console.error('Error setting user online:', error);
+        console.error('[RTDB] Error setting user online:', error);
       }
     };
 
     setUserOnline();
 
-    // Cleanup on unmount - NOTE: This may not complete if unmount is abrupt
-    // For reliable signout, use setUserOfflineBeforeSignout() explicitly
+    // Cleanup on unmount
     return () => {
-      // Use navigator.sendBeacon for best-effort cleanup
-      // This works better than async during unmount
-      const presenceRef = doc(db, 'canvases', CANVAS_ID, 'presence', user.uid);
+      const presenceRef = ref(database, `presence/${CANVAS_ID}/${user.uid}`);
       
-      // Synchronous fallback attempt
-      setDoc(presenceRef, {
+      // Set offline on unmount (onDisconnect already handles network drops)
+      set(presenceRef, {
+        userId: user.uid,
+        userName: user.displayName || 'Anonymous',
+        userEmail: user.email,
+        photoURL: user.photoURL || null,
+        role: canvasOwnerId === user.uid ? 'owner' : 'collaborator',
         online: false,
-        lastSeen: serverTimestamp(),
-      }, { merge: true }).catch(err => {
-        console.error('Error setting user offline on unmount:', err);
+        kicked: false,
+        lastSeen: Date.now(),
+      }).catch(err => {
+        console.error('[RTDB] Error setting user offline on unmount:', err);
       });
     };
   }, [user, canvasOwnerId]);
 
-  // Handle page close/refresh - set user offline
+  // Handle page close/refresh - RTDB onDisconnect handles this automatically
+  // No beforeunload listener needed - onDisconnect() does the work for us!
+
+  // Subscribe to presence in RTDB
   useEffect(() => {
     if (!user) return;
 
-    const handleBeforeUnload = async () => {
-      try {
-        const presenceRef = doc(db, 'canvases', CANVAS_ID, 'presence', user.uid);
-        // Use keepalive to ensure request completes even if page is closing
-        await setDoc(presenceRef, {
-          online: false,
-          lastSeen: serverTimestamp(),
-        }, { merge: true });
-      } catch (error) {
-        console.error('Error in beforeunload:', error);
-      }
-    };
+    console.log('[RTDB] Setting up presence subscription...');
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    const presenceRef = ref(database, `presence/${CANVAS_ID}`);
     
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [user, canvasOwnerId]);
-
-  // Subscribe to presence collection
-  useEffect(() => {
-    if (!user) return;
-
-    console.log('Setting up presence subscription...');
-
-    const presenceRef = collection(db, 'canvases', CANVAS_ID, 'presence');
-    
-    const unsubscribe = onSnapshot(presenceRef, (snapshot) => {
+    const handlePresenceUpdate = (snapshot) => {
       const allUsers = [];
       let onlineUsers = 0;
+      const presenceData = snapshot.val();
       
-      snapshot.forEach((doc) => {
-        const userData = {
-          userId: doc.id,
-          ...doc.data(),
-        };
-        
-        allUsers.push(userData);
-        
-        if (userData.online) {
-          onlineUsers++;
-        }
-      });
+      if (presenceData) {
+        Object.entries(presenceData).forEach(([userId, userData]) => {
+          const user = {
+            userId,
+            ...userData,
+          };
+          
+          allUsers.push(user);
+          
+          if (userData.online) {
+            onlineUsers++;
+          }
+        });
+      }
       
       // Sort: owner first, then by name
       allUsers.sort((a, b) => {
@@ -145,14 +142,16 @@ export function usePresence(canvasOwnerId) {
       
       setUsers(allUsers);
       setOnlineCount(onlineUsers);
-      console.log('Presence updated:', onlineUsers, 'online,', allUsers.length, 'total');
-    }, (error) => {
-      console.error('Error in presence subscription:', error);
+      console.log('[RTDB] Presence updated:', onlineUsers, 'online,', allUsers.length, 'total');
+    };
+    
+    onValue(presenceRef, handlePresenceUpdate, (error) => {
+      console.error('[RTDB] Error in presence subscription:', error);
     });
 
     return () => {
-      console.log('Cleaning up presence subscription...');
-      unsubscribe();
+      console.log('[RTDB] Cleaning up presence subscription...');
+      off(presenceRef, 'value', handlePresenceUpdate);
     };
   }, [user]);
 
@@ -160,15 +159,15 @@ export function usePresence(canvasOwnerId) {
   useEffect(() => {
     if (!user) return;
 
-    const myPresenceRef = doc(db, 'canvases', CANVAS_ID, 'presence', user.uid);
+    const myPresenceRef = ref(database, `presence/${CANVAS_ID}/${user.uid}`);
     
-    const unsubscribe = onSnapshot(myPresenceRef, (snapshot) => {
+    const handleMyPresenceUpdate = (snapshot) => {
       if (snapshot.exists()) {
-        const data = snapshot.data();
+        const data = snapshot.val();
         
         // Check if we've been kicked
         if (data.kicked && data.online === false) {
-          console.log('User was kicked from canvas');
+          console.log('[RTDB] User was kicked from canvas');
           setWasKicked(true);
           
           // Sign out after a short delay to show message
@@ -177,11 +176,15 @@ export function usePresence(canvasOwnerId) {
           }, 3000);
         }
       }
-    }, (error) => {
-      console.error('Error listening to own presence:', error);
+    };
+    
+    onValue(myPresenceRef, handleMyPresenceUpdate, (error) => {
+      console.error('[RTDB] Error listening to own presence:', error);
     });
 
-    return () => unsubscribe();
+    return () => {
+      off(myPresenceRef, 'value', handleMyPresenceUpdate);
+    };
   }, [user, signOut]);
 
   /**
@@ -201,10 +204,28 @@ export function usePresence(canvasOwnerId) {
     }
     
     try {
-      await kickUserFromFirestore(userId);
-      console.log('Successfully kicked user:', userId);
+      const userPresenceRef = ref(database, `presence/${CANVAS_ID}/${userId}`);
+      
+      // Get current user data
+      const snapshot = await new Promise((resolve, reject) => {
+        onValue(userPresenceRef, resolve, reject, { onlyOnce: true });
+      });
+      
+      if (snapshot.exists()) {
+        const userData = snapshot.val();
+        
+        // Update presence to mark as kicked and offline
+        await set(userPresenceRef, {
+          ...userData,
+          online: false,
+          kicked: true,
+          lastSeen: Date.now(),
+        });
+        
+        console.log('[RTDB] Successfully kicked user:', userId);
+      }
     } catch (error) {
-      console.error('Failed to kick user:', error);
+      console.error('[RTDB] Failed to kick user:', error);
       throw error;
     }
   };
@@ -217,14 +238,25 @@ export function usePresence(canvasOwnerId) {
     if (!user) return;
     
     try {
-      const presenceRef = doc(db, 'canvases', CANVAS_ID, 'presence', user.uid);
-      await setDoc(presenceRef, {
-        online: false,
-        lastSeen: serverTimestamp(),
-      }, { merge: true });
-      console.log('User explicitly set to offline before signout');
+      const presenceRef = ref(database, `presence/${CANVAS_ID}/${user.uid}`);
+      
+      // Get current user data
+      const snapshot = await new Promise((resolve, reject) => {
+        onValue(presenceRef, resolve, reject, { onlyOnce: true });
+      });
+      
+      if (snapshot.exists()) {
+        const userData = snapshot.val();
+        await set(presenceRef, {
+          ...userData,
+          online: false,
+          lastSeen: Date.now(),
+        });
+      }
+      
+      console.log('[RTDB] User explicitly set to offline before signout');
     } catch (error) {
-      console.error('Error setting user offline before signout:', error);
+      console.error('[RTDB] Error setting user offline before signout:', error);
     }
   };
 

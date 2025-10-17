@@ -1,23 +1,22 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
-  collection, 
-  doc, 
-  setDoc,
-  deleteDoc,
-  getDocs,
-  onSnapshot,
-  serverTimestamp 
-} from 'firebase/firestore';
-import { db } from '../lib/firebase';
+  ref, 
+  onValue, 
+  set,
+  remove,
+  off 
+} from 'firebase/database';
+import { database } from '../lib/firebase';
 import { useAuth } from './useAuth';
 
 const CANVAS_ID = 'main';
-const THROTTLE_MS = 50; // 20 updates per second
+const THROTTLE_MS = 50; // 20 updates per second (sub-50ms target)
 
 /**
- * Custom hook for cursor synchronization
+ * Custom hook for cursor synchronization via RTDB
  * Manages local cursor position updates and subscribes to remote cursors
- * Throttles updates to 50-100ms to avoid excessive Firestore writes
+ * Uses Firebase Realtime Database for sub-50ms cursor sync latency
+ * Throttles updates to 50ms to avoid excessive RTDB writes (20 updates/sec)
  * Only shows cursors for users who are currently online
  * 
  * @param {Array} onlineUserIds - Array of user IDs who are currently online
@@ -35,42 +34,49 @@ export function useCursors(onlineUserIds = []) {
   const lastUpdateRef = useRef(0);
   const pendingUpdateRef = useRef(null);
 
-  // Subscribe to cursors collection
+  // Subscribe to cursors in RTDB
   useEffect(() => {
     if (!user) return;
 
-    console.log('Setting up cursor subscription...');
+    console.log('[RTDB] Setting up cursor subscription...');
 
-    const cursorsRef = collection(db, 'canvases', CANVAS_ID, 'cursors');
+    const cursorsRef = ref(database, `cursors/${CANVAS_ID}`);
     
-    const unsubscribe = onSnapshot(cursorsRef, (snapshot) => {
+    const handleCursorsUpdate = (snapshot) => {
       const remoteCursors = [];
+      const cursorsData = snapshot.val();
       
-      snapshot.forEach((doc) => {
-        // Filter out current user's cursor
-        if (doc.id !== user.uid) {
-          remoteCursors.push({
-            userId: doc.id,
-            ...doc.data(),
-          });
-        }
-      });
+      if (cursorsData) {
+        Object.entries(cursorsData).forEach(([userId, cursorData]) => {
+          // Filter out current user's cursor
+          if (userId !== user.uid) {
+            remoteCursors.push({
+              userId,
+              ...cursorData,
+            });
+          }
+        });
+      }
       
       setAllCursors(remoteCursors);
-      console.log('All remote cursors:', remoteCursors.length);
-    }, (error) => {
-      console.error('Error in cursors subscription:', error);
+      console.log('[RTDB] All remote cursors:', remoteCursors.length);
+    };
+    
+    // Subscribe to RTDB value changes
+    onValue(cursorsRef, handleCursorsUpdate, (error) => {
+      console.error('[RTDB] Error in cursors subscription:', error);
     });
 
     return () => {
-      console.log('Cleaning up cursor subscription...');
-      unsubscribe();
+      console.log('[RTDB] Cleaning up cursor subscription...');
+      off(cursorsRef, 'value', handleCursorsUpdate);
     };
   }, [user]);
 
   /**
-   * Update cursor position with throttling
-   * Throttles to 50-100ms to prevent excessive Firestore writes
+   * Update cursor position with throttling to RTDB
+   * Throttles to 50ms to prevent excessive writes (20 updates/sec)
+   * Target: Sub-50ms sync latency
    * 
    * @param {number} x - Canvas X coordinate
    * @param {number} y - Canvas Y coordinate
@@ -93,34 +99,33 @@ export function useCursors(onlineUserIds = []) {
     lastUpdateRef.current = now;
 
     try {
-      const cursorRef = doc(db, 'canvases', CANVAS_ID, 'cursors', user.uid);
-      await setDoc(cursorRef, {
+      const cursorRef = ref(database, `cursors/${CANVAS_ID}/${user.uid}`);
+      await set(cursorRef, {
         x,
         y,
         userName: user.displayName,
         photoURL: user.photoURL || null,
-        lastUpdate: serverTimestamp(),
+        timestamp: now, // Use client timestamp for latency measurement
       });
     } catch (error) {
-      console.error('Error updating cursor position:', error);
+      console.error('[RTDB] Error updating cursor position:', error);
       // Fail silently - cursor updates are not critical
     }
   }, [user]);
 
   /**
-   * Remove current user's cursor from Firestore
+   * Remove current user's cursor from RTDB
    * Called on unmount or when user leaves canvas
    */
   const removeCursor = useCallback(async () => {
     if (!user) return;
 
     try {
-      const cursorRef = doc(db, 'canvases', CANVAS_ID, 'cursors', user.uid);
-      // Delete the cursor document completely
-      await deleteDoc(cursorRef);
-      console.log('Cursor removed for user:', user.displayName);
+      const cursorRef = ref(database, `cursors/${CANVAS_ID}/${user.uid}`);
+      await remove(cursorRef);
+      console.log('[RTDB] Cursor removed for user:', user.displayName);
     } catch (error) {
-      console.error('Error removing cursor:', error);
+      console.error('[RTDB] Error removing cursor:', error);
     }
   }, [user]);
 
@@ -150,26 +155,32 @@ export function useCursors(onlineUserIds = []) {
 
     const cleanupStaleCursors = async () => {
       try {
-        const cursorsRef = collection(db, 'canvases', CANVAS_ID, 'cursors');
-        const snapshot = await getDocs(cursorsRef);
+        const cursorsRef = ref(database, `cursors/${CANVAS_ID}`);
+        const snapshot = await new Promise((resolve, reject) => {
+          onValue(cursorsRef, resolve, reject, { onlyOnce: true });
+        });
+        
+        const cursorsData = snapshot.val();
+        if (!cursorsData) return;
         
         const onlineUserIdSet = new Set(onlineUserIds);
         const deletePromises = [];
         
-        snapshot.forEach((doc) => {
+        Object.keys(cursorsData).forEach((userId) => {
           // If cursor belongs to offline user, delete it
-          if (!onlineUserIdSet.has(doc.id)) {
-            console.log(`Deleting stale cursor for offline user: ${doc.id}`);
-            deletePromises.push(deleteDoc(doc.ref));
+          if (!onlineUserIdSet.has(userId)) {
+            console.log(`[RTDB] Deleting stale cursor for offline user: ${userId}`);
+            const cursorRef = ref(database, `cursors/${CANVAS_ID}/${userId}`);
+            deletePromises.push(remove(cursorRef));
           }
         });
         
         if (deletePromises.length > 0) {
           await Promise.all(deletePromises);
-          console.log(`Cleaned up ${deletePromises.length} stale cursors`);
+          console.log(`[RTDB] Cleaned up ${deletePromises.length} stale cursors`);
         }
       } catch (error) {
-        console.error('Error cleaning up stale cursors:', error);
+        console.error('[RTDB] Error cleaning up stale cursors:', error);
       }
     };
 

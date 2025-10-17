@@ -156,12 +156,17 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
                 // Update local state immediately for smooth dragging
                 const newWidth = parseInt(e.target.value);
                 setTempLineWidth(newWidth);
+                
+                // Send to RTDB for real-time sync to other users (sub-100ms)
+                if (selectedLine && onLineWidthInput) {
+                  onLineWidthInput(selectedLine.id, newWidth);
+                }
               }}
               onChange={(e) => {
                 const newWidth = parseInt(e.target.value);
                 
                 if (selectedLine) {
-                  // Update selected line's width
+                  // Update selected line's width (writes to Firestore)
                   if (onUpdateLineWidth) {
                     onUpdateLineWidth(selectedLine.id, newWidth);
                   }

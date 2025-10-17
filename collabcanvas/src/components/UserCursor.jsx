@@ -1,13 +1,15 @@
+import { memo } from 'react';
 import { getUserColor } from '../lib/canvasUtils';
 import './UserCursor.css';
 
 /**
  * UserCursor component - Renders a remote user's cursor with name label
  * Now renders as regular HTML outside Konva canvas to avoid Html component issues
+ * Optimized with React.memo to prevent unnecessary re-renders
  * 
  * @param {Object} cursor - Cursor data (userId, userName, x, y, photoURL)
  */
-export default function UserCursor({ cursor }) {
+function UserCursor({ cursor }) {
   const color = getUserColor(cursor.userId);
 
   return (
@@ -51,4 +53,15 @@ export default function UserCursor({ cursor }) {
     </div>
   );
 }
+
+// Export memoized component to prevent unnecessary re-renders
+// Only re-render if cursor position or name changes
+export default memo(UserCursor, (prevProps, nextProps) => {
+  return (
+    prevProps.cursor.userId === nextProps.cursor.userId &&
+    prevProps.cursor.x === nextProps.cursor.x &&
+    prevProps.cursor.y === nextProps.cursor.y &&
+    prevProps.cursor.userName === nextProps.cursor.userName
+  );
+});
 

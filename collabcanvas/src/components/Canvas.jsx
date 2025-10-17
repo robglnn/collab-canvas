@@ -6,6 +6,7 @@ import { usePresence } from '../hooks/usePresence';
 import { useAuth } from '../hooks/useAuth';
 import { useHistory } from '../hooks/useHistory';
 import { useAI } from '../hooks/useAI';
+import { useRTDB } from '../hooks/useRTDB';
 import { screenToCanvas } from '../lib/canvasUtils';
 import Toolbar from './Toolbar';
 import Shape from './Shape';
@@ -47,6 +48,9 @@ export default function Canvas() {
   
   // Optimistic updates state (for instant UI feedback)
   const [optimisticUpdates, setOptimisticUpdates] = useState({}); // { shapeId: { updates } }
+  
+  // RTDB temp updates state (for sub-100ms sync to other users)
+  const [tempUpdates, setTempUpdates] = useState({}); // { shapeId: { updates } }
   
   // Context menu state
   const [contextMenu, setContextMenu] = useState(null);
@@ -95,6 +99,20 @@ export default function Canvas() {
   
   // Cursors hook - pass online user IDs to filter cursors
   const { cursors, updateCursorPosition, removeCursor } = useCursors(onlineUserIds);
+
+  // RTDB hook for temporary updates (sub-100ms sync)
+  const { writeTempUpdate, subscribeTempUpdates, clearTempUpdate } = useRTDB('main');
+  
+  // Subscribe to RTDB temp updates from other users
+  useEffect(() => {
+    const unsubscribe = subscribeTempUpdates((updates) => {
+      setTempUpdates(updates);
+    });
+    
+    return () => {
+      unsubscribe();
+    };
+  }, [subscribeTempUpdates]);
 
   // History hook for undo/redo
   const { canUndo, canRedo, takeSnapshot, undo, redo, clearHistory } = useHistory();
@@ -883,7 +901,26 @@ export default function Canvas() {
   };
 
   /**
-   * Handle line width update for selected line (with optimistic update)
+   * Handle line width input event (while dragging slider)
+   * Uses RTDB for sub-100ms sync to other users
+   */
+  const handleLineWidthInput = (shapeId, newWidth) => {
+    const shape = shapes.find(s => s.id === shapeId);
+    if (shape && shape.type === 'line') {
+      // 1. Optimistic update: Update local state immediately (0ms)
+      setOptimisticUpdates(prev => ({
+        ...prev,
+        [shapeId]: { strokeWidth: newWidth }
+      }));
+      
+      // 2. Write to RTDB for other users (50-100ms sync)
+      writeTempUpdate(shapeId, { strokeWidth: newWidth });
+    }
+  };
+
+  /**
+   * Handle line width final update (on slider release)
+   * Writes to Firestore for persistence and clears RTDB temp update
    */
   const handleUpdateLineWidth = (shapeId, newWidth) => {
     const shape = shapes.find(s => s.id === shapeId);
@@ -891,20 +928,23 @@ export default function Canvas() {
       // Take snapshot before modifying (for undo/redo)
       takeSnapshot(shapes);
       
-      // Optimistic update: Update local state immediately for instant visual feedback
+      // Keep optimistic update for instant feedback
       setOptimisticUpdates(prev => ({
         ...prev,
         [shapeId]: { strokeWidth: newWidth }
       }));
       
-      // Update Firestore in background
+      // 3. Write to Firestore (permanent, 100-200ms)
       updateShape(shapeId, { strokeWidth: newWidth }).then(() => {
-        // Clear optimistic update once Firestore has synced
+        // 4. Clear both optimistic and RTDB temp updates
         setOptimisticUpdates(prev => {
           const updated = { ...prev };
           delete updated[shapeId];
           return updated;
         });
+        
+        // Clear RTDB temp update
+        clearTempUpdate(shapeId);
       });
     }
   };
@@ -994,6 +1034,7 @@ export default function Canvas() {
           onCreateShape={handleCreateShape}
           selectedShapes={[]}
           onUpdateLineWidth={handleUpdateLineWidth}
+          onLineWidthInput={handleLineWidthInput}
         />
         <div className="canvas-loading">
           <div className="loading-spinner"></div>
@@ -1003,12 +1044,18 @@ export default function Canvas() {
     );
   }
 
-  // Apply optimistic updates to shapes for instant UI feedback
+  // Apply optimistic updates and RTDB temp updates to shapes
+  // Priority: optimisticUpdates (local) > tempUpdates (RTDB from others) > shapes (Firestore)
   const shapesWithOptimisticUpdates = shapes.map(shape => {
-    if (optimisticUpdates[shape.id]) {
-      return { ...shape, ...optimisticUpdates[shape.id] };
-    }
-    return shape;
+    const rtdbUpdate = tempUpdates[shape.id] || {};
+    const localUpdate = optimisticUpdates[shape.id] || {};
+    
+    // Merge: base shape + RTDB updates + local optimistic updates
+    return { 
+      ...shape, 
+      ...rtdbUpdate, // Apply RTDB temp updates from other users
+      ...localUpdate // Apply local optimistic updates (highest priority)
+    };
   });
 
   // Get selected shapes for Toolbar (with optimistic updates applied)
@@ -1020,6 +1067,7 @@ export default function Canvas() {
         onCreateShape={handleCreateShape}
         selectedShapes={selectedShapes}
         onUpdateLineWidth={handleUpdateLineWidth}
+        onLineWidthInput={handleLineWidthInput}
       >
         <AICommandBar 
           onSubmit={handleAISubmit} 
