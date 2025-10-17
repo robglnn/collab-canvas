@@ -390,4 +390,10 @@ All decisions have been made. Time to start building:
 - [x] **Conflict Resolution:** Last-write-wins + owner priority lock
 - [x] **Reconnect Strategy:** Show banner after 3 seconds → prompt refresh → fetch full state, don't merge
 - [x] **Optimistic Updates:** Roll back on Firestore write failure
+- [x] **AI Canvas Agent:** ✅ Natural language commands (PRs #26-29)
+  - GPT-4 Turbo integration with function calling
+  - Command types: creation, manipulation, layout, selection, templates, queries
+  - UI templates: login form, nav bar, card, button, dashboard, sidebar
+  - Rate limiting: 5s cooldown per user, 300/min per canvas
+  - Undo/redo integration, input validation, multi-user queue
 - [x] **Originally Out of Scope:** ~~Undo/redo~~ ✅ (PR #21), ~~multi-select~~ ✅ (PR #18), shape customization (still pending), mobile support (still pending)
