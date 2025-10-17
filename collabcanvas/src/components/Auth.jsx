@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import './Auth.css';
 
@@ -6,8 +7,32 @@ import './Auth.css';
  * Displays sign-in page when user is not authenticated
  * Shows user info and sign-out button when authenticated
  */
-export default function Auth({ children }) {
+export default function Auth({ children, usersButton, onBeforeSignOut }) {
   const { user, loading, error, signInWithGoogle, signOut } = useAuth();
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+
+    if (isUserMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isUserMenuOpen]);
+
+  const handleSignOut = async () => {
+    setIsUserMenuOpen(false);
+    if (onBeforeSignOut) {
+      await onBeforeSignOut();
+    }
+    signOut();
+  };
 
   // Show loading spinner while checking auth state
   if (loading) {
@@ -62,24 +87,46 @@ export default function Auth({ children }) {
         </div>
         
         <div className="header-right">
-          <div className="user-info">
-            {user.photoURL && (
-              <img 
-                src={user.photoURL} 
-                alt={user.displayName} 
-                className="user-avatar"
-              />
-            )}
-            <span className="user-name">{user.displayName}</span>
-          </div>
+          {/* Users online button */}
+          {usersButton}
           
-          <button 
-            className="signout-btn" 
-            onClick={signOut}
-            disabled={loading}
-          >
-            Sign Out
-          </button>
+          {/* User account menu */}
+          <div className="user-menu-container" ref={userMenuRef}>
+            <button 
+              className="user-account-button"
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+              title="Account menu"
+            >
+              {user.photoURL && (
+                <img 
+                  src={user.photoURL} 
+                  alt={user.displayName} 
+                  className="user-avatar"
+                />
+              )}
+            </button>
+
+            {/* User dropdown menu */}
+            {isUserMenuOpen && (
+              <div className="user-dropdown">
+                <div className="user-dropdown-header">
+                  <span>{user.displayName || 'User'}</span>
+                </div>
+                
+                <div className="user-dropdown-items">
+                  <button className="user-dropdown-item" onClick={() => setIsUserMenuOpen(false)}>
+                    <span className="dropdown-icon">⚙️</span>
+                    <span>Settings</span>
+                  </button>
+                  
+                  <button className="user-dropdown-item signout-item" onClick={handleSignOut}>
+                    <span className="dropdown-icon">🚪</span>
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

@@ -64,9 +64,9 @@ function App() {
   }
 
   return (
-    <Auth onBeforeSignOut={handleBeforeSignOut}>
-      <Canvas />
-      {user && (
+    <Auth 
+      onBeforeSignOut={handleBeforeSignOut}
+      usersButton={user && (
         <UserList 
           users={users} 
           onlineCount={onlineCount} 
@@ -75,6 +75,8 @@ function App() {
           onKickUser={kickUser}
         />
       )}
+    >
+      <Canvas />
     </Auth>
   );
 }

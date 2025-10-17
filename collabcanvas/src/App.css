@@ -1,3 +1,32 @@
+/* Top bar - Fixed at top of screen */
+.top-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
+  z-index: 999;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.top-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 /* Placeholder content for authenticated state */
 .placeholder-content {
   display: flex;
