@@ -396,4 +396,9 @@ All decisions have been made. Time to start building:
   - UI templates: login form, nav bar, card, button, dashboard, sidebar
   - Rate limiting: 5s cooldown per user, 300/min per canvas
   - Undo/redo integration, input validation, multi-user queue
+- [x] **Users Online Button:** ✅ Circular dropdown button in header (PR #24)
+  - Shows count of online users
+  - Click to see full list with avatars, names, and roles
+  - User account menu with Settings and Sign Out options
+  - Only displays currently online users
 - [x] **Originally Out of Scope:** ~~Undo/redo~~ ✅ (PR #21), ~~multi-select~~ ✅ (PR #18), shape customization (still pending), mobile support (still pending)

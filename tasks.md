@@ -1333,7 +1333,7 @@ collabcanvas/
 
 ---
 
-## PR #24: Users Online Button
+## PR #24: Users Online Button ✅ COMPLETE
 
 **Branch:** `feature/users-button`
 
@@ -1341,7 +1341,7 @@ collabcanvas/
 
 ### Tasks:
 
-- [ ] **24.1: Create Users Online Button**
+- [x] **24.1: Create Users Online Button**
   - Show "XX Users" text (count of online users)
   - Position in top bar, left of user profile icon
   - Click to toggle dropdown
@@ -1349,7 +1349,7 @@ collabcanvas/
     - `src/App.jsx`
     - `src/components/UserList.jsx` (convert to dropdown)
 
-- [ ] **24.2: Create Users Dropdown**
+- [x] **24.2: Create Users Dropdown**
   - Show full user list when button clicked
   - Display user names, photos, roles
   - Click outside to close
@@ -1357,18 +1357,30 @@ collabcanvas/
     - `src/components/UserList.jsx`
     - `src/components/UserList.css`
 
-- [ ] **24.3: Update Top Bar Layout**
+- [x] **24.3: Update Top Bar Layout**
   - Add top bar container
   - Left side: connection indicator + users button
   - Right side: user profile
   - **Files Modified:**
     - `src/App.jsx`
-    - `src/index.css`
+    - `src/App.css`
+    - `src/components/Auth.jsx`
+    - `src/components/Auth.css`
 
-- [ ] **24.4: Test Users Button**
+- [x] **24.4: Test Users Button**
   - Test user count updates in real-time
   - Test dropdown shows/hides correctly
   - Test with multiple users joining/leaving
+
+**Implementation Details:**
+- Converted UserList from sidebar to circular 40px dropdown button
+- Created user account dropdown menu matching users button design
+- Added Settings and Sign Out options to user menu
+- Integrated both buttons into Auth header (removed separate top bar)
+- Only display online users in dropdown
+- Optimized dropdown width (180px) and padding
+- Added overflow handling for long user names
+- Matched both circle buttons at 40px diameter for consistency
 
 ---
 
@@ -1457,7 +1469,7 @@ collabcanvas/
 21. ✅ Undo/Redo System (7 hours) - COMPLETE
 22. ⬜ Layers Panel (5-6 hours)
 23. ⬜ Comments System (6-8 hours)
-24. ⬜ Users Online Button (2-3 hours)
+24. ✅ Users Online Button (3 hours) - COMPLETE
 25. ⬜ Connection Indicator (2-3 hours)
 
 **Total Estimated Effort for PRs 13-25:** 50-65 hours
