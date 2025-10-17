@@ -40,6 +40,13 @@ export default function Canvas() {
   
   // Place mode state
   const [placeMode, setPlaceMode] = useState(null); // null or 'rectangle'
+  const [placeModeOptions, setPlaceModeOptions] = useState(null); // Options for place mode (e.g., lineWidth)
+  
+  // Line tool state
+  const [lineStartPoint, setLineStartPoint] = useState(null); // First click point for line tool
+  
+  // Optimistic updates state (for instant UI feedback)
+  const [optimisticUpdates, setOptimisticUpdates] = useState({}); // { shapeId: { updates } }
   
   // Context menu state
   const [contextMenu, setContextMenu] = useState(null);
@@ -91,6 +98,21 @@ export default function Canvas() {
 
   // History hook for undo/redo
   const { canUndo, canRedo, takeSnapshot, undo, redo, clearHistory } = useHistory();
+
+  // Expose updateLineWidth function to Toolbar (for dynamic line width changes)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.updateLineWidth = (newWidth) => {
+        setPlaceModeOptions({ lineWidth: newWidth });
+      };
+    }
+    
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.updateLineWidth = undefined;
+      }
+    };
+  }, []);
 
   // AI hook - pass canvas context
   const aiContext = useMemo(() => ({
@@ -796,6 +818,43 @@ export default function Canvas() {
         if (window.exitPlaceMode) {
           window.exitPlaceMode();
         }
+      } else if (placeMode === 'line') {
+        // Two-click line placement
+        const stage = stageRef.current;
+        const pointerPos = stage.getPointerPosition();
+        const canvasPos = screenToCanvas(pointerPos, stage);
+
+        if (!lineStartPoint) {
+          // First click: store start point
+          setLineStartPoint(canvasPos);
+          console.log('Line start point set:', canvasPos);
+        } else {
+          // Second click: create line
+          const lineWidth = placeModeOptions?.lineWidth || 3;
+          
+          const newShape = {
+            id: `shape-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            type: 'line',
+            x: 0, // Lines use points array, x/y are not used but kept for consistency
+            y: 0,
+            points: [lineStartPoint.x, lineStartPoint.y, canvasPos.x, canvasPos.y],
+            stroke: '#000000', // Black by default
+            strokeWidth: lineWidth,
+            rotation: 0,
+          };
+
+          takeSnapshot(shapes); // Take snapshot before adding
+          addShape(newShape);
+          
+          // Reset line tool
+          setLineStartPoint(null);
+          setPlaceMode(null);
+          setPlaceModeOptions(null);
+          if (window.exitPlaceMode) {
+            window.exitPlaceMode();
+          }
+          console.log('Line created:', newShape);
+        }
       } else {
         // Don't deselect if we just completed a selection box
         if (justCompletedSelectionRef.current) {
@@ -817,8 +876,37 @@ export default function Canvas() {
   /**
    * Handle toolbar create shape request
    */
-  const handleCreateShape = (shapeType) => {
+  const handleCreateShape = (shapeType, options = null) => {
     setPlaceMode(shapeType);
+    setPlaceModeOptions(options);
+    setLineStartPoint(null); // Reset line start point when entering line mode
+  };
+
+  /**
+   * Handle line width update for selected line (with optimistic update)
+   */
+  const handleUpdateLineWidth = (shapeId, newWidth) => {
+    const shape = shapes.find(s => s.id === shapeId);
+    if (shape && shape.type === 'line') {
+      // Take snapshot before modifying (for undo/redo)
+      takeSnapshot(shapes);
+      
+      // Optimistic update: Update local state immediately for instant visual feedback
+      setOptimisticUpdates(prev => ({
+        ...prev,
+        [shapeId]: { strokeWidth: newWidth }
+      }));
+      
+      // Update Firestore in background
+      updateShape(shapeId, { strokeWidth: newWidth }).then(() => {
+        // Clear optimistic update once Firestore has synced
+        setOptimisticUpdates(prev => {
+          const updated = { ...prev };
+          delete updated[shapeId];
+          return updated;
+        });
+      });
+    }
   };
 
   /**
@@ -902,7 +990,11 @@ export default function Canvas() {
   if (loading) {
     return (
       <div className="canvas-container">
-        <Toolbar onCreateShape={handleCreateShape} />
+        <Toolbar 
+          onCreateShape={handleCreateShape}
+          selectedShapes={[]}
+          onUpdateLineWidth={handleUpdateLineWidth}
+        />
         <div className="canvas-loading">
           <div className="loading-spinner"></div>
           <p>Loading canvas...</p>
@@ -911,9 +1003,24 @@ export default function Canvas() {
     );
   }
 
+  // Apply optimistic updates to shapes for instant UI feedback
+  const shapesWithOptimisticUpdates = shapes.map(shape => {
+    if (optimisticUpdates[shape.id]) {
+      return { ...shape, ...optimisticUpdates[shape.id] };
+    }
+    return shape;
+  });
+
+  // Get selected shapes for Toolbar (with optimistic updates applied)
+  const selectedShapes = shapesWithOptimisticUpdates.filter(s => selectedShapeIds.includes(s.id));
+
   return (
     <div className="canvas-container">
-      <Toolbar onCreateShape={handleCreateShape}>
+      <Toolbar 
+        onCreateShape={handleCreateShape}
+        selectedShapes={selectedShapes}
+        onUpdateLineWidth={handleUpdateLineWidth}
+      >
         <AICommandBar 
           onSubmit={handleAISubmit} 
           isProcessing={isProcessing}
@@ -956,8 +1063,8 @@ export default function Canvas() {
               listening={false}
             />
             
-            {/* Render all shapes */}
-            {shapes.map((shape) => (
+            {/* Render all shapes (with optimistic updates for instant feedback) */}
+            {shapesWithOptimisticUpdates.map((shape) => (
               <Shape
                 key={shape.id}
                 shape={shape}

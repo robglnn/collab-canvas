@@ -3,15 +3,27 @@ import './Toolbar.css';
 
 /**
  * Toolbar component with shape creation buttons
- * Currently supports: Rectangle, Circle, Text
+ * Currently supports: Rectangle, Circle, Text, Line
  * Also includes AI Command Bar as children
  * 
  * @param {Function} onCreateShape - Callback when shape creation is requested
+ * @param {Array} selectedShapes - Currently selected shapes
+ * @param {Function} onUpdateLineWidth - Callback to update selected line's width
  * @param {ReactNode} children - Optional children (e.g., AI Command Bar)
  */
-export default function Toolbar({ onCreateShape, children }) {
+export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLineWidth, children }) {
   const [isPlaceMode, setIsPlaceMode] = useState(false);
   const [activeShape, setActiveShape] = useState(null);
+  const [lineWidth, setLineWidth] = useState(3);
+  const [tempLineWidth, setTempLineWidth] = useState(null); // Temporary width while dragging
+
+  // Check if a single line is selected
+  const selectedLine = selectedShapes.length === 1 && selectedShapes[0].type === 'line' ? selectedShapes[0] : null;
+
+  // Get the current width to display
+  const displayWidth = tempLineWidth !== null 
+    ? tempLineWidth 
+    : (selectedLine ? (selectedLine.strokeWidth || 3) : lineWidth);
 
   /**
    * Handle rectangle button click
@@ -44,6 +56,17 @@ export default function Toolbar({ onCreateShape, children }) {
     setActiveShape('text');
     onCreateShape('text');
     console.log('Place mode activated: text');
+  };
+
+  /**
+   * Handle line button click
+   * Enters "place mode" where user clicks twice to create a line
+   */
+  const handleLineClick = () => {
+    setIsPlaceMode(true);
+    setActiveShape('line');
+    onCreateShape('line', { lineWidth });
+    console.log('Place mode activated: line');
   };
 
   /**
@@ -105,11 +128,69 @@ export default function Toolbar({ onCreateShape, children }) {
           </svg>
           <span>Text</span>
         </button>
+
+        <button
+          className={`toolbar-btn ${isPlaceMode && activeShape === 'line' ? 'active' : ''}`}
+          onClick={handleLineClick}
+          title="Click twice to draw a line"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <line x1="4" y1="18" x2="20" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+          <span>Line</span>
+        </button>
       </div>
+
+      {/* Line Width Controls - Show when creating line OR when line is selected */}
+      {((isPlaceMode && activeShape === 'line') || selectedLine) && (
+        <div className="toolbar-section">
+          <h3 className="toolbar-title">Line Width</h3>
+          <label className="toolbar-label">
+            {displayWidth}px
+            <input
+              type="range"
+              min="1"
+              max="20"
+              value={displayWidth}
+              onInput={(e) => {
+                // Update local state immediately for smooth dragging
+                const newWidth = parseInt(e.target.value);
+                setTempLineWidth(newWidth);
+              }}
+              onChange={(e) => {
+                const newWidth = parseInt(e.target.value);
+                
+                if (selectedLine) {
+                  // Update selected line's width
+                  if (onUpdateLineWidth) {
+                    onUpdateLineWidth(selectedLine.id, newWidth);
+                  }
+                  setTempLineWidth(null); // Clear temp value after update
+                } else {
+                  // Update line width for line creation mode
+                  setLineWidth(newWidth);
+                  if (typeof window !== 'undefined' && window.updateLineWidth) {
+                    window.updateLineWidth(newWidth);
+                  }
+                }
+              }}
+              onMouseUp={() => {
+                // Also clear temp value on mouse up
+                if (tempLineWidth !== null && selectedLine) {
+                  setTempLineWidth(null);
+                }
+              }}
+              className="line-width-slider"
+            />
+          </label>
+        </div>
+      )}
 
       {isPlaceMode && (
         <div className="toolbar-hint">
-          Click on canvas to place {activeShape}
+          {activeShape === 'line' 
+            ? 'Click twice on canvas to draw a line' 
+            : `Click on canvas to place ${activeShape}`}
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, memo } from 'react';
-import { Rect, Circle, Transformer, Text, Group } from 'react-konva';
+import { Rect, Circle, Transformer, Text, Group, Line } from 'react-konva';
 
 /**
  * Shape component - Renders a single shape on the canvas
@@ -122,11 +122,31 @@ const Shape = memo(function Shape({
   const handleDragEnd = (e) => {
     if (!canEdit) return;
     
-    onChange({
-      ...shape,
-      x: e.target.x(),
-      y: e.target.y(),
-    });
+    if (shape.type === 'line') {
+      // For lines, move both endpoints by the drag delta
+      const deltaX = e.target.x() - shape.x;
+      const deltaY = e.target.y() - shape.y;
+      
+      const updatedPoints = [
+        shape.points[0] + deltaX,
+        shape.points[1] + deltaY,
+        shape.points[2] + deltaX,
+        shape.points[3] + deltaY,
+      ];
+      
+      onChange({
+        ...shape,
+        x: e.target.x(),
+        y: e.target.y(),
+        points: updatedPoints,
+      });
+    } else {
+      onChange({
+        ...shape,
+        x: e.target.x(),
+        y: e.target.y(),
+      });
+    }
     
     // Notify parent that drag is complete
     if (onDragEndComplete) {
@@ -207,9 +227,9 @@ const Shape = memo(function Shape({
     x: shape.x,
     y: shape.y,
     rotation: shape.rotation || 0,
-    fill: "#000000", // All shapes are black for MVP
-    stroke: strokeColor,
-    strokeWidth: strokeWidth,
+    fill: shape.type === 'line' ? undefined : "#000000", // Lines don't use fill
+    stroke: shape.type === 'line' ? shape.stroke || '#000000' : strokeColor,
+    strokeWidth: shape.type === 'line' ? shape.strokeWidth || 3 : strokeWidth,
     draggable: canEdit,
     onClick: handleClick,
     onTap: handleClick,
@@ -248,6 +268,14 @@ const Shape = memo(function Shape({
             width={shape.width || 200}
             align={shape.align || 'left'}
           />
+        ) : shape.type === 'line' ? (
+          <Line
+            {...commonProps}
+            points={shape.points || [0, 0, 100, 100]}
+            lineCap="round"
+            lineJoin="round"
+            hitStrokeWidth={Math.max(20, shape.strokeWidth || 3)} // Wider hit area for easier selection
+          />
         ) : (
           <Rect
             {...commonProps}
@@ -259,8 +287,8 @@ const Shape = memo(function Shape({
         {/* Lock indicator label */}
         {(isLockedByOther && showLockLabel) && (
           <Text
-            x={shape.x}
-            y={shape.type === 'circle' ? shape.y - shape.radius - 25 : shape.y - 25}
+            x={shape.type === 'line' ? shape.points[0] : shape.x}
+            y={shape.type === 'circle' ? shape.y - shape.radius - 25 : shape.type === 'line' ? shape.points[1] - 25 : shape.y - 25}
             text={`🔒 ${lockedByName || 'Locked'}`}
             fontSize={14}
             fill="#ef4444"
@@ -272,7 +300,7 @@ const Shape = memo(function Shape({
         )}
       </Group>
       
-      {isSelected && canEdit && (
+      {isSelected && canEdit && shape.type !== 'line' && (
         <Transformer
           ref={transformerRef}
           boundBoxFunc={(oldBox, newBox) => {

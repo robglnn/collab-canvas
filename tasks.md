@@ -1384,6 +1384,105 @@ collabcanvas/
 
 ---
 
+## PR #30: Hybrid Architecture - Firestore + RTDB
+
+**Branch:** `feature/hybrid-rtdb`
+
+**Goal:** Achieve sub-100ms object sync and sub-50ms cursor sync by adding Firebase Realtime Database for high-frequency updates
+
+**Performance Requirements:**
+- ✅ Sub-100ms object sync
+- ✅ Sub-50ms cursor sync
+- ✅ Zero visible lag during rapid multi-user edits
+- ✅ 1000+ objects at 60 FPS
+- ✅ 10+ concurrent users
+
+**Current Bottleneck:**
+- Firestore: 100-200ms latency per write
+- Cursors feel sluggish at 100-200ms
+- Line width slider feels locked during updates
+- 10+ users cause write contention
+
+**Solution Architecture:**
+
+**Firestore (Persistent Storage):**
+- shapes collection (permanent shape data)
+- users collection (authentication, permissions)
+- aiCommands collection (AI command history)
+- Canvas metadata
+
+**RTDB (Real-Time Updates):**
+- `/cursors/{canvasId}/{userId}` → {x, y, timestamp}
+- `/tempUpdates/{canvasId}/{shapeId}` → {strokeWidth, x, y, ...}
+- `/presence/{canvasId}/{userId}` → {online, lastSeen}
+
+### Tasks:
+
+- [ ] **30.1: Add RTDB Configuration**
+  - Add RTDB to firebase.js
+  - Initialize database reference
+  - Add RTDB URL to .env.local
+  - **Files Modified:**
+    - `src/lib/firebase.js`
+    - `.env.local.example`
+
+- [ ] **30.2: Migrate Cursors to RTDB**
+  - Move cursor updates from Firestore to RTDB
+  - Update useCursors hook to use RTDB
+  - Throttle to 50ms (20 updates/sec)
+  - **Target:** Sub-50ms cursor sync
+  - **Files Modified:**
+    - `src/hooks/useCursors.js`
+
+- [ ] **30.3: Migrate Presence to RTDB**
+  - Move online/offline status to RTDB
+  - Use RTDB's built-in `.onDisconnect()`
+  - Real-time online user count
+  - **Files Modified:**
+    - `src/hooks/usePresence.js`
+
+- [ ] **30.4: Add Temp Updates for Shape Edits**
+  - Create useRTDB hook for temp updates
+  - Line width changes go to RTDB first
+  - On mouse up, write to Firestore (permanent)
+  - RTDB updates cleared after Firestore write
+  - **Target:** Sub-100ms sync for rapid edits
+  - **Files Created:**
+    - `src/hooks/useRTDB.js`
+  - **Files Modified:**
+    - `src/components/Canvas.jsx`
+
+- [ ] **30.5: Implement Optimistic Updates Pattern**
+  - Update local state immediately (instant UI)
+  - Write to RTDB (50-100ms to others)
+  - Write to Firestore (persistent)
+  - Rollback on failure
+  - **Files Modified:**
+    - `src/hooks/useCanvas.js`
+    - `src/components/Canvas.jsx`
+
+- [ ] **30.6: Add RTDB Security Rules**
+  - Write rules for cursors (any authenticated user)
+  - Write rules for tempUpdates (canvas collaborators only)
+  - Write rules for presence
+  - **Files Created:**
+    - `database.rules.json`
+
+- [ ] **30.7: Test Performance**
+  - Test cursor sync with 10+ users (target: <50ms)
+  - Test line width drag with multiple users (target: <100ms)
+  - Test rapid shape edits (target: zero visible lag)
+  - Load test with 1000+ shapes
+  - Monitor Firebase quota usage
+
+**Implementation Notes:**
+- Keep Firestore as source of truth for permanent data
+- RTDB is ephemeral/cache layer for real-time updates
+- On page load: Read from Firestore (shapes), RTDB (cursors/presence)
+- Sync pattern: Local → RTDB → Firestore (for persistence)
+
+---
+
 ## PR #25: Connection Indicator
 
 **Branch:** `feature/connection-indicator`
@@ -1461,7 +1560,7 @@ collabcanvas/
 13. ⬜ Advanced Color System (4-5 hours)
 14. ⬜ Rename Rectangle to Square (15 minutes)
 15. ✅ Circle Tool (2 hours) - COMPLETE
-16. ⬜ Line Tool (4-5 hours)
+16. 🔄 Line Tool (4-5 hours) - IN PROGRESS
 17. ✅ Text Tool - Basic Only (2 hours) - COMPLETE
 18. ✅ Multi-Select with Selection Box (5 hours) - COMPLETE
 19. ✅ Copy/Paste Shapes (2 hours) - COMPLETE
@@ -1493,14 +1592,23 @@ collabcanvas/
 
 **Total Effort PRs 26-29:** 19 hours - ALL COMPLETE ✅
 
+### Performance & Scaling (PR 30)
+30. ⬜ Hybrid Architecture: Firestore + RTDB (3-4 hours)
+  - **Goal:** Meet sub-100ms object sync and sub-50ms cursor sync requirements
+  - **Current bottleneck:** Firestore 100-200ms latency for high-frequency updates
+  - **Solution:** Hybrid approach using both databases
+
+**Total Effort PR 30:** 3-4 hours
+
 **PROGRESS UPDATE:**
 - ✅ Essential Features (PRs 15-21): 20 hours COMPLETE
 - ✅ AI Agent (PRs 26-29): 19 hours COMPLETE
-- Buffer: 1 hour
+- 🔄 Line Tool (PR 16): IN PROGRESS
+- ⏳ Performance Optimization (PR 30): PLANNED
 
-**PROJECT STATUS:** FULLY COMPLETE ✅
+**PROJECT STATUS:** DEPLOYED + ACTIVE DEVELOPMENT ✅
 **DEPLOYED:** https://collab-canvas-d0e38.web.app
-**FINAL RUBRIC SCORE:** 97/100 (A Grade)
+**CURRENT RUBRIC SCORE:** 97/100 (A Grade)
 
 ---
 

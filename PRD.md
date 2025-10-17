@@ -89,12 +89,18 @@
 
 ---
 
-### ✅ Selected Tech Stack: Firebase
+### ✅ Selected Tech Stack: Firebase (Hybrid Architecture)
 
 **Backend:**
-- Firebase Firestore (real-time database)
+- Firebase Firestore (persistent storage for shapes, users, AI commands)
+- Firebase Realtime Database (RTDB) (high-frequency updates: cursors, temp edits, presence)
 - Firebase Authentication (Google OAuth)
 - Firebase Hosting (deployment)
+
+**Architecture Decision (PR #30):**
+- **Firestore:** Persistent data (shapes, permissions, canvas metadata)
+- **RTDB:** Ephemeral real-time data (cursors, line width while dragging, presence)
+- **Reason:** Achieve sub-100ms object sync and sub-50ms cursor sync requirements
 
 **Frontend:**
 - React + Vite
@@ -385,8 +391,14 @@ All decisions have been made. Time to start building:
 - [x] **Pan & Zoom:** Left-click drag, middle-click drag, scroll wheel (up/down), Shift+scroll (left/right), Ctrl+scroll (zoom)
 - [x] **Owner Assignment:** First user to load app becomes permanent owner
 - [x] **Owner Controls:** Can kick users (shapes remain) + gets priority lock + can override locked shapes via right-click menu
-- [x] **Cursor Update Frequency:** 10-20 updates/second (50-100ms)
-- [x] **Object Sync Target:** ≤100ms
+- [x] **Cursor Update Frequency:** 10-20 updates/second (50-100ms) → 🔄 **UPGRADING to sub-50ms with RTDB (PR #30)**
+- [x] **Object Sync Target:** ≤100ms → 🔄 **UPGRADING to sub-100ms with RTDB (PR #30)**
+- [x] **Performance Requirements (PR #30 - Hybrid Architecture):**
+  - ✅ Sub-50ms cursor sync via Firebase RTDB
+  - ✅ Sub-100ms object sync for rapid edits via RTDB temp updates
+  - ✅ Zero visible lag during multi-user edits (optimistic updates)
+  - ✅ 1000+ objects at 60 FPS rendering
+  - ✅ 10+ concurrent users without write contention
 - [x] **Conflict Resolution:** Last-write-wins + owner priority lock
 - [x] **Reconnect Strategy:** Show banner after 3 seconds → prompt refresh → fetch full state, don't merge
 - [x] **Optimistic Updates:** Roll back on Firestore write failure
