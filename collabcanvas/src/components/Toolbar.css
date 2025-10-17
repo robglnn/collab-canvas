@@ -83,6 +83,7 @@
   background: #e0e0e0;
   outline: none;
   cursor: pointer;
+  appearance: none;
   -webkit-appearance: none;
 }
 
