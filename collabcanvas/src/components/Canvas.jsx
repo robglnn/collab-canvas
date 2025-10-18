@@ -66,6 +66,9 @@ export default function Canvas() {
   // Debug panel expansion state
   const [isDebugExpanded, setIsDebugExpanded] = useState(false);
 
+  // Color selection state
+  const [selectedColor, setSelectedColor] = useState('#000000');
+
   // Auth hook
   const { user } = useAuth();
 
@@ -154,6 +157,38 @@ export default function Canvas() {
     return () => {
       if (typeof window !== 'undefined') {
         window.updateTextFormatting = undefined;
+      }
+    };
+  }, [selectedShapeIds, shapes, updateShape, takeSnapshot]);
+
+  // Expose updateSelectedColor function to Toolbar (for color changes)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.updateSelectedColor = (color) => {
+        setSelectedColor(color);
+        
+        // Apply to selected shapes
+        if (selectedShapeIds.length > 0) {
+          takeSnapshot(shapes); // Take snapshot before modifying
+          selectedShapeIds.forEach(shapeId => {
+            const shape = shapes.find(s => s.id === shapeId);
+            if (shape) {
+              const updates = {};
+              if (shape.type === 'line') {
+                updates.stroke = color; // Lines use stroke color
+              } else {
+                updates.fill = color; // Other shapes use fill color
+              }
+              updateShape(shapeId, updates);
+            }
+          });
+        }
+      };
+    }
+    
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.updateSelectedColor = undefined;
       }
     };
   }, [selectedShapeIds, shapes, updateShape, takeSnapshot]);
@@ -797,6 +832,7 @@ export default function Canvas() {
           y: canvasPos.y,
           width: 100,
           height: 100,
+          fill: selectedColor, // Apply selected color
           rotation: 0, // Initialize rotation at 0 degrees
         };
 
@@ -820,6 +856,7 @@ export default function Canvas() {
           x: canvasPos.x,
           y: canvasPos.y,
           radius: 50, // Default radius of 50px (100px diameter)
+          fill: selectedColor, // Apply selected color
           rotation: 0,
         };
 
@@ -851,6 +888,7 @@ export default function Canvas() {
           fontFamily: fontFamily,
           fontStyle: isBold ? 'bold' : 'normal',
           textDecoration: isUnderline ? 'underline' : 'none',
+          fill: selectedColor, // Apply selected color
           width: 200,
           rotation: 0,
         };
@@ -883,7 +921,7 @@ export default function Canvas() {
             x: 0, // Lines use points array, x/y are not used but kept for consistency
             y: 0,
             points: [lineStartPoint.x, lineStartPoint.y, canvasPos.x, canvasPos.y],
-            stroke: '#000000', // Black by default
+            stroke: selectedColor, // Apply selected color
             strokeWidth: lineWidth,
             rotation: 0,
           };

@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '../hooks/useAuth';
+import { useUserPreferences } from '../hooks/useUserPreferences';
 import './Toolbar.css';
 
 /**
@@ -15,6 +17,9 @@ import './Toolbar.css';
  * @param {ReactNode} children - Optional children (e.g., AI Command Bar)
  */
 export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLineWidth, onLineWidthInput, debugData, isDebugExpanded, onToggleDebug, children }) {
+  const { user } = useAuth();
+  const { customColors, saveCustomColor, loading: prefsLoading } = useUserPreferences(user?.uid);
+
   const [isPlaceMode, setIsPlaceMode] = useState(false);
   const [activeShape, setActiveShape] = useState(null);
   const [lineWidth, setLineWidth] = useState(3);
@@ -24,6 +29,25 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
   const [fontFamily, setFontFamily] = useState('Arial');
   const [isBold, setIsBold] = useState(false);
   const [isUnderline, setIsUnderline] = useState(false);
+
+  // Color picker state
+  const [selectedColor, setSelectedColor] = useState('#000000'); // Default black
+  const [hexInput, setHexInput] = useState('#000000');
+  const [hexError, setHexError] = useState('');
+
+  // Default color palette (10 colors)
+  const defaultColors = [
+    '#000000', // Black
+    '#FF0000', // Red
+    '#00FF00', // Green
+    '#0000FF', // Blue
+    '#FFFF00', // Yellow
+    '#FF00FF', // Magenta
+    '#00FFFF', // Cyan
+    '#FFA500', // Orange
+    '#800080', // Purple
+    '#FFFFFF', // White
+  ];
 
   // Check if a single line is selected
   const selectedLine = selectedShapes.length === 1 && selectedShapes[0].type === 'line' ? selectedShapes[0] : null;
@@ -90,6 +114,50 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
     console.log('Place mode deactivated');
   };
 
+  /**
+   * Handle color selection
+   */
+  const handleColorSelect = (color) => {
+    setSelectedColor(color);
+    setHexInput(color);
+    setHexError('');
+    
+    // Apply color to window for Canvas to access
+    if (typeof window !== 'undefined' && window.updateSelectedColor) {
+      window.updateSelectedColor(color);
+    }
+  };
+
+  /**
+   * Validate hex color format
+   */
+  const isValidHex = (hex) => {
+    return /^#[0-9A-F]{6}$/i.test(hex);
+  };
+
+  /**
+   * Handle hex input apply
+   */
+  const handleHexApply = () => {
+    const trimmedHex = hexInput.trim().toUpperCase();
+    
+    if (!isValidHex(trimmedHex)) {
+      setHexError('Invalid hex format (use #RRGGBB)');
+      return;
+    }
+
+    setHexError('');
+    handleColorSelect(trimmedHex);
+  };
+
+  /**
+   * Handle saving custom color to slot
+   */
+  const handleSaveCustomColor = (slotIndex) => {
+    saveCustomColor(slotIndex, selectedColor);
+    console.log(`Saved ${selectedColor} to custom slot ${slotIndex}`);
+  };
+
   // Expose exitPlaceMode to parent component
   // This is a bit of a hack - we'll use a ref or context in a real app
   if (typeof window !== 'undefined') {
@@ -151,6 +219,75 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
           </svg>
           <span>Line</span>
         </button>
+      </div>
+
+      {/* Color Picker */}
+      <div className="toolbar-section">
+        <h3 className="toolbar-title">Colors</h3>
+        
+        {/* Default Colors */}
+        <div className="color-grid">
+          {defaultColors.map((color) => (
+            <button
+              key={color}
+              className={`color-swatch ${selectedColor === color ? 'selected' : ''}`}
+              style={{ backgroundColor: color }}
+              onClick={() => handleColorSelect(color)}
+              title={color}
+            />
+          ))}
+        </div>
+
+        {/* Custom Colors */}
+        <div className="custom-colors-label">Custom Colors</div>
+        <div className="color-grid">
+          {[0, 1, 2, 3, 4].map((slotIndex) => {
+            const customColor = customColors[slotIndex];
+            return (
+              <button
+                key={`custom-${slotIndex}`}
+                className={`color-swatch custom-swatch ${selectedColor === customColor && customColor ? 'selected' : ''} ${!customColor ? 'empty' : ''}`}
+                style={{ backgroundColor: customColor || '#e0e0e0' }}
+                onClick={() => customColor && handleColorSelect(customColor)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  handleSaveCustomColor(slotIndex);
+                }}
+                title={customColor ? `${customColor} (Right-click to overwrite)` : 'Right-click to save current color'}
+              />
+            );
+          })}
+        </div>
+
+        {/* Hex Input */}
+        <div className="hex-input-container">
+          <input
+            type="text"
+            value={hexInput}
+            onChange={(e) => setHexInput(e.target.value.toUpperCase())}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleHexApply();
+              }
+            }}
+            placeholder="#000000"
+            className="hex-input"
+            maxLength={7}
+          />
+          <button
+            onClick={handleHexApply}
+            className="hex-apply-btn"
+          >
+            Apply
+          </button>
+        </div>
+        {hexError && <div className="hex-error">{hexError}</div>}
+
+        {/* Current Color Display */}
+        <div className="current-color-display">
+          <div className="current-color-box" style={{ backgroundColor: selectedColor }} />
+          <span className="current-color-label">{selectedColor}</span>
+        </div>
       </div>
 
       {/* Line Width Controls - Show when creating line OR when line is selected */}

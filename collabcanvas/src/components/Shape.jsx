@@ -247,9 +247,9 @@ const Shape = memo(function Shape({
     x: shape.x,
     y: shape.y,
     rotation: shape.rotation || 0,
-    fill: shape.type === 'line' ? undefined : "#000000", // Lines don't use fill
-    stroke: shape.type === 'line' ? shape.stroke || '#000000' : strokeColor,
-    strokeWidth: shape.type === 'line' ? shape.strokeWidth || 3 : strokeWidth,
+    // Note: fill and stroke are applied per-shape type below
+    stroke: shape.type === 'line' ? undefined : strokeColor, // Lines use stroke in their definition
+    strokeWidth: shape.type === 'line' ? undefined : strokeWidth, // Lines use strokeWidth in their definition
     draggable: canEdit,
     onClick: handleClick,
     onTap: handleClick,
@@ -278,6 +278,7 @@ const Shape = memo(function Shape({
           <Circle
             {...commonProps}
             radius={shape.radius}
+            fill={shape.fill || '#000000'}
           />
         ) : shape.type === 'text' ? (
           <Text
@@ -287,6 +288,7 @@ const Shape = memo(function Shape({
             fontFamily={shape.fontFamily || 'Arial'}
             fontStyle={shape.fontStyle || 'normal'}
             textDecoration={shape.textDecoration || 'none'}
+            fill={shape.fill || '#000000'}
             width={shape.width || 200}
             align={shape.align || 'left'}
           />
@@ -294,6 +296,7 @@ const Shape = memo(function Shape({
           <Line
             {...commonProps}
             points={shape.points || [0, 0, 100, 100]}
+            stroke={shape.stroke || '#000000'}
             lineCap="round"
             lineJoin="round"
             hitStrokeWidth={Math.max(20, shape.strokeWidth || 3)} // Wider hit area for easier selection
@@ -303,6 +306,7 @@ const Shape = memo(function Shape({
             {...commonProps}
             width={shape.width}
             height={shape.height}
+            fill={shape.fill || '#000000'}
           />
         )}
         

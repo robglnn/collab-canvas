@@ -47,6 +47,12 @@ service cloud.firestore {
         allow delete: if isAuthenticated() && request.auth.uid == userId;
       }
     }
+    
+    // User preferences collection
+    match /users/{userId} {
+      // Users can only read and write their own preferences
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
   }
 }
 
