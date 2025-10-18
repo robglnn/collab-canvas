@@ -11,6 +11,8 @@
   padding: 1rem;
   z-index: 10;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .toolbar-title {
@@ -141,6 +143,80 @@
   }
 }
 
+/* Debug/Zoom Button Container - Pushes to bottom */
+.toolbar-debug-container {
+  margin-top: auto;
+  padding-top: 1rem;
+}
+
+.toolbar-debug-btn {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.85);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.toolbar-debug-btn:hover {
+  background: rgba(0, 0, 0, 0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.toolbar-debug-btn:active {
+  transform: translateY(0);
+}
+
+/* Compact view (default) */
+.debug-compact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.debug-compact svg {
+  flex-shrink: 0;
+}
+
+/* Expanded view */
+.debug-expanded {
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.debug-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.debug-header svg {
+  flex-shrink: 0;
+}
+
+.debug-content {
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+
+.debug-content div {
+  margin: 0.25rem 0;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .toolbar {
@@ -162,6 +238,10 @@
   }
 
   .toolbar-hint {
+    display: none;
+  }
+
+  .debug-compact span {
     display: none;
   }
 }

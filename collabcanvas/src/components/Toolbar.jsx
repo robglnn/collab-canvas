@@ -9,9 +9,12 @@ import './Toolbar.css';
  * @param {Function} onCreateShape - Callback when shape creation is requested
  * @param {Array} selectedShapes - Currently selected shapes
  * @param {Function} onUpdateLineWidth - Callback to update selected line's width
+ * @param {Object} debugData - Debug information to display
+ * @param {Boolean} isDebugExpanded - Whether debug panel is expanded
+ * @param {Function} onToggleDebug - Callback to toggle debug panel
  * @param {ReactNode} children - Optional children (e.g., AI Command Bar)
  */
-export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLineWidth, children }) {
+export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLineWidth, debugData, isDebugExpanded, onToggleDebug, children }) {
   const [isPlaceMode, setIsPlaceMode] = useState(false);
   const [activeShape, setActiveShape] = useState(null);
   const [lineWidth, setLineWidth] = useState(3);
@@ -196,6 +199,46 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
           {activeShape === 'line' 
             ? 'Click twice on canvas to draw a line' 
             : `Click on canvas to place ${activeShape}`}
+        </div>
+      )}
+
+      {/* Debug/Zoom button at bottom */}
+      {debugData && (
+        <div className="toolbar-debug-container">
+          <button
+            className={`toolbar-debug-btn ${isDebugExpanded ? 'expanded' : ''}`}
+            onClick={onToggleDebug}
+            title={isDebugExpanded ? 'Click to collapse' : 'Click to expand debug info'}
+          >
+            {isDebugExpanded ? (
+              <div className="debug-expanded">
+                <div className="debug-header">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M19 9l-7 7-7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <span>Debug Info</span>
+                </div>
+                <div className="debug-content">
+                  <div>Zoom: {(debugData.zoom * 100).toFixed(0)}%</div>
+                  <div>Canvas Center: ({debugData.canvasCenter.x}, {debugData.canvasCenter.y})</div>
+                  <div>Cursor: ({debugData.cursor.x}, {debugData.cursor.y})</div>
+                  <div>Stage Offset: ({debugData.stageOffset.x}, {debugData.stageOffset.y})</div>
+                  <div>Canvas: {debugData.canvasSize.width}x{debugData.canvasSize.height}px</div>
+                  <div>Shapes: {debugData.shapesCount} | Cursors: {debugData.cursorsCount}</div>
+                  <div>Role: {debugData.role}</div>
+                  {debugData.selectedCount > 0 && <div>Selected: {debugData.selectedCount} shape(s)</div>}
+                </div>
+              </div>
+            ) : (
+              <div className="debug-compact">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2"/>
+                  <path d="M12 8v4l2 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                <span>{(debugData.zoom * 100).toFixed(0)}%</span>
+              </div>
+            )}
+          </button>
         </div>
       )}
     </div>

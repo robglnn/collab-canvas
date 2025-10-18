@@ -63,6 +63,9 @@ export default function Canvas() {
   // Cursor position on canvas (for debug display) - using ref to avoid re-renders
   const cursorCanvasPosRef = useRef({ x: 0, y: 0 });
 
+  // Debug panel expansion state
+  const [isDebugExpanded, setIsDebugExpanded] = useState(false);
+
   // Auth hook
   const { user } = useAuth();
 
@@ -1048,6 +1051,22 @@ export default function Canvas() {
         selectedShapes={selectedShapes}
         onUpdateLineWidth={handleUpdateLineWidth}
         onLineWidthInput={handleLineWidthInput}
+        debugData={{
+          zoom: stageScale,
+          canvasCenter: {
+            x: Math.round((window.innerWidth / 2 - stagePos.x) / stageScale),
+            y: Math.round((window.innerHeight / 2 - stagePos.y) / stageScale)
+          },
+          cursor: cursorCanvasPosRef.current,
+          stageOffset: { x: Math.round(stagePos.x), y: Math.round(stagePos.y) },
+          canvasSize: { width: CANVAS_WIDTH, height: CANVAS_HEIGHT },
+          shapesCount: shapes.length,
+          cursorsCount: cursors.length,
+          role: isOwner ? 'Owner' : 'Collaborator',
+          selectedCount: selectedShapeIds.length
+        }}
+        isDebugExpanded={isDebugExpanded}
+        onToggleDebug={() => setIsDebugExpanded(!isDebugExpanded)}
       >
         <AICommandBar 
           onSubmit={handleAISubmit} 
@@ -1152,22 +1171,6 @@ export default function Canvas() {
             />
           );
         })}
-
-        {/* Debug info */}
-        <div className="canvas-debug">
-          <div>Zoom: {(stageScale * 100).toFixed(0)}%</div>
-          <div>Canvas Center: ({
-            Math.round((window.innerWidth / 2 - stagePos.x) / stageScale)
-          }, {
-            Math.round((window.innerHeight / 2 - stagePos.y) / stageScale)
-          })</div>
-          <div>Cursor: ({cursorCanvasPosRef.current.x}, {cursorCanvasPosRef.current.y})</div>
-          <div>Stage Offset: ({Math.round(stagePos.x)}, {Math.round(stagePos.y)})</div>
-          <div>Canvas: {CANVAS_WIDTH}x{CANVAS_HEIGHT}px</div>
-          <div>Shapes: {shapes.length} | Cursors: {cursors.length}</div>
-          <div>Role: {isOwner ? 'Owner' : 'Collaborator'}</div>
-          {selectedShapeIds.length > 0 && <div>Selected: {selectedShapeIds.length} shape(s)</div>}
-        </div>
 
         {/* Context menu */}
         {contextMenu && (
