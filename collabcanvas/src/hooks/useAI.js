@@ -75,8 +75,15 @@ export function useAI(canvasContext) {
       console.log('Submitting AI command:', command);
       console.log('Canvas context:', context);
 
-      // Call OpenAI with command and function schemas
-      const response = await callOpenAI(command, aiTools, context);
+      // Call OpenAI with command and function schemas with 10-second timeout
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('AI command timeout after 10 seconds')), 10000)
+      );
+      
+      const response = await Promise.race([
+        callOpenAI(command, aiTools, context),
+        timeoutPromise
+      ]);
 
       console.log('OpenAI response:', response);
 
@@ -87,9 +94,16 @@ export function useAI(canvasContext) {
         throw new Error('No response from AI');
       }
 
-      // Handle function calls
+      // Handle function calls with timeout
       if (message.tool_calls && message.tool_calls.length > 0) {
-        const results = await executeFunctionCalls(message.tool_calls, canvasContext);
+        const executionTimeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('AI execution timeout after 10 seconds')), 10000)
+        );
+        
+        const results = await Promise.race([
+          executeFunctionCalls(message.tool_calls, canvasContext),
+          executionTimeoutPromise
+        ]);
         
         setLastResult(results);
         setIsProcessing(false);

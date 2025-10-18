@@ -132,6 +132,14 @@ export default function Canvas() {
     };
   }, []);
 
+  // Create AI-specific shape update function that skips RTDB for batch operations
+  const updateShapeForAI = useCallback(async (shapeId, updates) => {
+    // AI operations skip RTDB to avoid performance overhead
+    // They only write to Firestore (persistent) since AI batch operations
+    // don't need real-time sync - they complete in <2 seconds
+    return updateShape(shapeId, updates);
+  }, [updateShape]);
+
   // AI hook - pass canvas context
   const aiContext = useMemo(() => ({
     shapes,
@@ -140,12 +148,14 @@ export default function Canvas() {
     stageScale,
     stageRef,
     addShape,
-    updateShape,
+    updateShape: updateShapeForAI, // Use AI-specific version
     deleteShape,
     selectShape,
     deselectShape,
-    user
-  }), [shapes, selectedShapeIds, stagePos, stageScale, addShape, updateShape, deleteShape, selectShape, deselectShape, user]);
+    user,
+    takeSnapshot, // Add takeSnapshot for undo/redo
+    viewport: { x: stagePos.x, y: stagePos.y, scale: stageScale }
+  }), [shapes, selectedShapeIds, stagePos, stageScale, addShape, updateShapeForAI, deleteShape, selectShape, deselectShape, user, takeSnapshot]);
 
   const { submitCommand, isProcessing, lastResult, error, clearResult, cooldownRemaining, isOnCooldown } = useAI(aiContext);
 
