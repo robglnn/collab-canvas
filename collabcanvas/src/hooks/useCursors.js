@@ -59,6 +59,7 @@ export function useCursors(onlineUserIds = []) {
               userId,
               ...cursorData,
             });
+            console.log(`[RTDB] Cursor update for ${cursorData.userName}: (${Math.round(cursorData.x)}, ${Math.round(cursorData.y)})`);
           }
         });
       }
