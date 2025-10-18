@@ -976,108 +976,12 @@ export default function Canvas() {
   };
 
   /**
-   * Handle drag/transform end - write to Firestore and clear RTDB temp updates
-   * IMPORTANT: Don't clear optimistic updates immediately - let Firestore listener override them
+   * Handle drag/transform end - reset snapshot flag
+   * OPTION A: Simple approach - Firestore writes already happened during drag
    */
-  const handleDragEndComplete = useCallback((shapeId) => {
+  const handleDragEndComplete = useCallback(() => {
     dragSnapshotTakenRef.current = false;
-    
-    // Unmark shapes as being dragged AFTER Firestore write completes
-    const shapesToUnmark = selectedShapeIds.length > 1 ? selectedShapeIds : [shapeId];
-    
-    // Write final positions to Firestore
-    if (selectedShapeIds.length > 1) {
-      // Multi-select: write all selected shapes
-      selectedShapeIds.forEach(id => {
-        const optimisticUpdate = optimisticUpdates[id];
-        if (optimisticUpdate) {
-          // Write only the properties that changed
-          const updates = {};
-          if (optimisticUpdate.x !== undefined) updates.x = optimisticUpdate.x;
-          if (optimisticUpdate.y !== undefined) updates.y = optimisticUpdate.y;
-          if (optimisticUpdate.width !== undefined) updates.width = optimisticUpdate.width;
-          if (optimisticUpdate.height !== undefined) updates.height = optimisticUpdate.height;
-          if (optimisticUpdate.rotation !== undefined) updates.rotation = optimisticUpdate.rotation;
-          if (optimisticUpdate.scaleX !== undefined) updates.scaleX = optimisticUpdate.scaleX;
-          if (optimisticUpdate.scaleY !== undefined) updates.scaleY = optimisticUpdate.scaleY;
-          
-          if (Object.keys(updates).length > 0) {
-            updateShape(id, updates).then(() => {
-              // After Firestore write succeeds, clear optimistic update and drag state
-              setOptimisticUpdates(prev => {
-                const updated = { ...prev };
-                delete updated[id];
-                return updated;
-              });
-              
-              // Wait a bit for Firestore to propagate, then unmark as being dragged
-              setTimeout(() => {
-                setShapesBeingDragged(prev => {
-                  const newSet = new Set(prev);
-                  newSet.delete(id);
-                  return newSet;
-                });
-              }, 500); // 500ms grace period for Firestore propagation
-            }).catch((error) => {
-              console.error(`Failed to persist shape ${id}:`, error);
-              // Unmark immediately on error
-              setShapesBeingDragged(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(id);
-                return newSet;
-              });
-            });
-          }
-        }
-        // Clear RTDB temp update immediately (ephemeral data)
-        clearTempUpdate(id);
-      });
-    } else if (shapeId) {
-      // Single shape: write to Firestore
-      const optimisticUpdate = optimisticUpdates[shapeId];
-      if (optimisticUpdate) {
-        // Write only the properties that changed
-        const updates = {};
-        if (optimisticUpdate.x !== undefined) updates.x = optimisticUpdate.x;
-        if (optimisticUpdate.y !== undefined) updates.y = optimisticUpdate.y;
-        if (optimisticUpdate.width !== undefined) updates.width = optimisticUpdate.width;
-        if (optimisticUpdate.height !== undefined) updates.height = optimisticUpdate.height;
-        if (optimisticUpdate.rotation !== undefined) updates.rotation = optimisticUpdate.rotation;
-        if (optimisticUpdate.scaleX !== undefined) updates.scaleX = optimisticUpdate.scaleX;
-        if (optimisticUpdate.scaleY !== undefined) updates.scaleY = optimisticUpdate.scaleY;
-        
-        if (Object.keys(updates).length > 0) {
-          updateShape(shapeId, updates).then(() => {
-            // After Firestore write succeeds, clear optimistic update and drag state
-            setOptimisticUpdates(prev => {
-              const updated = { ...prev };
-              delete updated[shapeId];
-              return updated;
-            });
-            
-            // Wait a bit for Firestore to propagate, then unmark as being dragged
-            setTimeout(() => {
-              setShapesBeingDragged(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(shapeId);
-                return newSet;
-              });
-            }, 500); // 500ms grace period for Firestore propagation
-          }).catch((error) => {
-            console.error(`Failed to persist shape ${shapeId}:`, error);
-            // Unmark immediately on error
-            setShapesBeingDragged(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(shapeId);
-              return newSet;
-            });
-          });
-        }
-      }
-      // Clear RTDB temp update immediately (ephemeral data)
-      clearTempUpdate(shapeId);
-    }
-  }, [selectedShapeIds, optimisticUpdates, updateShape, clearTempUpdate]);
+  }, []);
 
   /**
    * Handle shape right-click
