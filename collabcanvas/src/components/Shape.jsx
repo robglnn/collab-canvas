@@ -48,11 +48,14 @@ const Shape = memo(function Shape({
   }, [isSelected, canEdit]);
 
   // Lock shape when selected
+  // Only run when selection state changes, not when shape updates from Firestore
   useEffect(() => {
     if (isSelected && canEdit && !shape.lockedBy) {
       onLock(shape.id);
     }
-  }, [isSelected, canEdit, shape.id, shape.lockedBy, onLock]);
+    // Intentionally exclude shape.lockedBy from deps to prevent re-locking on every Firestore update
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSelected, canEdit, shape.id, onLock]);
 
   // Force update draggable state when canEdit changes
   useEffect(() => {
