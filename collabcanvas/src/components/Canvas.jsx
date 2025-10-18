@@ -312,16 +312,13 @@ export default function Canvas() {
       viewportHeight
     );
 
-    // Apply clamping to ensure no gray void is visible on initial load
-    const clampedPos = clampPosition(initialPos, SPAWN_ZOOM);
-
-    setStagePos(clampedPos);
+    setStagePos(initialPos);
     setStageScale(SPAWN_ZOOM);
     setIsInitialized(true);
     
     console.log(`Canvas initialized: User spawned at canvas (${SPAWN_CANVAS_X}, ${SPAWN_CANVAS_Y}) with ${SPAWN_ZOOM * 100}% zoom`);
-    console.log(`Stage position: (${Math.round(clampedPos.x)}, ${Math.round(clampedPos.y)})`);
-  }, [CANVAS_WIDTH, CANVAS_HEIGHT, SPAWN_CANVAS_X, SPAWN_CANVAS_Y, SPAWN_ZOOM, isInitialized, calculateStagePosition, clampPosition]);
+    console.log(`Stage position: (${Math.round(initialPos.x)}, ${Math.round(initialPos.y)})`);
+  }, [CANVAS_WIDTH, CANVAS_HEIGHT, SPAWN_CANVAS_X, SPAWN_CANVAS_Y, SPAWN_ZOOM, isInitialized, calculateStagePosition]);
 
   /**
    * Handle keyboard events (Delete, Copy, Paste, Duplicate)
@@ -578,7 +575,6 @@ export default function Canvas() {
 
   /**
    * Clamp viewport position to stay within canvas boundaries
-   * Ensures no gray "void" space is ever visible - canvas always fills viewport
    */
   const clampPosition = useCallback((pos, scale) => {
     const stage = stageRef.current;
@@ -588,41 +584,15 @@ export default function Canvas() {
     const containerWidth = container.offsetWidth;
     const containerHeight = container.offsetHeight;
 
-    const canvasPixelWidth = CANVAS_WIDTH * scale;
-    const canvasPixelHeight = CANVAS_HEIGHT * scale;
-
-    let clampedX = pos.x;
-    let clampedY = pos.y;
-
-    // Horizontal clamping
-    if (canvasPixelWidth <= containerWidth) {
-      // Canvas is smaller than viewport - center it
-      clampedX = (containerWidth - canvasPixelWidth) / 2;
-    } else {
-      // Canvas is larger than viewport - prevent showing gray void
-      // Left edge of canvas can't be to the right of viewport left edge
-      const maxX = 0;
-      // Right edge of canvas can't be to the left of viewport right edge
-      const minX = containerWidth - canvasPixelWidth;
-      clampedX = Math.max(minX, Math.min(maxX, pos.x));
-    }
-
-    // Vertical clamping
-    if (canvasPixelHeight <= containerHeight) {
-      // Canvas is smaller than viewport - center it
-      clampedY = (containerHeight - canvasPixelHeight) / 2;
-    } else {
-      // Canvas is larger than viewport - prevent showing gray void
-      // Top edge of canvas can't be below viewport top edge
-      const maxY = 0;
-      // Bottom edge of canvas can't be above viewport bottom edge
-      const minY = containerHeight - canvasPixelHeight;
-      clampedY = Math.max(minY, Math.min(maxY, pos.y));
-    }
+    // Calculate the visible canvas bounds
+    const maxX = 0;
+    const minX = -(CANVAS_WIDTH * scale - containerWidth);
+    const maxY = 0;
+    const minY = -(CANVAS_HEIGHT * scale - containerHeight);
 
     return {
-      x: clampedX,
-      y: clampedY,
+      x: Math.max(minX, Math.min(maxX, pos.x)),
+      y: Math.max(minY, Math.min(maxY, pos.y)),
     };
   }, [CANVAS_WIDTH, CANVAS_HEIGHT]);
 
