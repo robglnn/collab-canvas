@@ -450,13 +450,40 @@ export default function Canvas() {
             top < box.y + box.height &&
             bottom > box.y
           );
-        } else {
-          // For rectangles, check standard AABB intersection
+        } else if (shape.type === 'text') {
+          // For text, estimate height from fontSize (text doesn't have explicit height)
+          const estimatedHeight = (shape.fontSize || 24) * 1.2; // Line height multiplier
           return (
             shape.x < box.x + box.width &&
-            shape.x + shape.width > box.x &&
+            shape.x + (shape.width || 200) > box.x &&
             shape.y < box.y + box.height &&
-            shape.y + shape.height > box.y
+            shape.y + estimatedHeight > box.y
+          );
+        } else if (shape.type === 'line') {
+          // For lines, check if any point is within selection box
+          if (!shape.points || shape.points.length < 4) return false;
+          
+          // Get line bounding box
+          const xCoords = shape.points.filter((_, i) => i % 2 === 0);
+          const yCoords = shape.points.filter((_, i) => i % 2 === 1);
+          const lineLeft = Math.min(...xCoords);
+          const lineRight = Math.max(...xCoords);
+          const lineTop = Math.min(...yCoords);
+          const lineBottom = Math.max(...yCoords);
+          
+          return (
+            lineLeft < box.x + box.width &&
+            lineRight > box.x &&
+            lineTop < box.y + box.height &&
+            lineBottom > box.y
+          );
+        } else {
+          // For rectangles and other shapes with width/height
+          return (
+            shape.x < box.x + box.width &&
+            shape.x + (shape.width || 0) > box.x &&
+            shape.y < box.y + box.height &&
+            shape.y + (shape.height || 0) > box.y
           );
         }
       }).map(shape => shape.id);
@@ -673,13 +700,40 @@ export default function Canvas() {
           top < box.y + box.height &&
           bottom > box.y
         );
-      } else {
-        // For rectangles, check standard AABB intersection
+      } else if (shape.type === 'text') {
+        // For text, estimate height from fontSize (text doesn't have explicit height)
+        const estimatedHeight = (shape.fontSize || 24) * 1.2; // Line height multiplier
         return (
           shape.x < box.x + box.width &&
-          shape.x + shape.width > box.x &&
+          shape.x + (shape.width || 200) > box.x &&
           shape.y < box.y + box.height &&
-          shape.y + shape.height > box.y
+          shape.y + estimatedHeight > box.y
+        );
+      } else if (shape.type === 'line') {
+        // For lines, check if any point is within selection box
+        if (!shape.points || shape.points.length < 4) return false;
+        
+        // Get line bounding box
+        const xCoords = shape.points.filter((_, i) => i % 2 === 0);
+        const yCoords = shape.points.filter((_, i) => i % 2 === 1);
+        const lineLeft = Math.min(...xCoords);
+        const lineRight = Math.max(...xCoords);
+        const lineTop = Math.min(...yCoords);
+        const lineBottom = Math.max(...yCoords);
+        
+        return (
+          lineLeft < box.x + box.width &&
+          lineRight > box.x &&
+          lineTop < box.y + box.height &&
+          lineBottom > box.y
+        );
+      } else {
+        // For rectangles and other shapes with width/height
+        return (
+          shape.x < box.x + box.width &&
+          shape.x + (shape.width || 0) > box.x &&
+          shape.y < box.y + box.height &&
+          shape.y + (shape.height || 0) > box.y
         );
       }
     }).map(shape => shape.id);
