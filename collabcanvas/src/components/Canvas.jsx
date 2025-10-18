@@ -1189,29 +1189,27 @@ export default function Canvas() {
   // Apply optimistic updates and RTDB temp updates to shapes
   // CRITICAL: Only apply local optimistic updates to shapes current user is manipulating!
   // For other shapes, show RTDB temp updates from other users
-  const shapesWithOptimisticUpdates = shapes
-    .filter(shape => !shapesBeingDragged.has(shape.id) || user?.uid === shape.lockedBy) // Filter out shapes being dragged by Firestore until drag completes
-    .map(shape => {
-      const rtdbUpdate = tempUpdates[shape.id] || {};
-      const localUpdate = optimisticUpdates[shape.id] || {};
-      
-      // If current user is manipulating this shape, show local optimistic updates
-      // Otherwise, show RTDB temp updates from other users
-      const isLocallyManipulated = Object.keys(localUpdate).length > 0;
-      
-      if (isLocallyManipulated) {
-        // Current user is dragging: show local optimistic updates only
-        return { 
-          ...shape, 
-          ...localUpdate // Local user sees their own changes instantly
-        };
-      } else {
-        // Other users are dragging: show their RTDB temp updates
-        return { 
-          ...shape, 
-          ...rtdbUpdate // Remote users' real-time updates
-        };
-      }
+  const shapesWithOptimisticUpdates = shapes.map(shape => {
+    const rtdbUpdate = tempUpdates[shape.id] || {};
+    const localUpdate = optimisticUpdates[shape.id] || {};
+    
+    // If current user is manipulating this shape, show local optimistic updates
+    // Otherwise, show RTDB temp updates from other users
+    const isLocallyManipulated = Object.keys(localUpdate).length > 0;
+    
+    if (isLocallyManipulated) {
+      // Current user is dragging: show local optimistic updates only
+      return { 
+        ...shape, 
+        ...localUpdate // Local user sees their own changes instantly
+      };
+    } else {
+      // Other users are dragging: show their RTDB temp updates
+      return { 
+        ...shape, 
+        ...rtdbUpdate // Remote users' real-time updates
+      };
+    }
   });
 
   // Get selected shapes for Toolbar (with optimistic updates applied)
