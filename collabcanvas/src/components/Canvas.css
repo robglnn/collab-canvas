@@ -12,8 +12,10 @@
 .canvas-workspace {
   position: relative;
   flex: 1;
-  overflow: hidden;
+  overflow: hidden; /* Clips cursors to workspace boundaries */
   cursor: grab;
+  /* Create a stacking context to contain cursors within workspace */
+  isolation: isolate;
 }
 
 .canvas-workspace.place-mode {

@@ -30,11 +30,15 @@ import './Canvas.css';
  */
 export default function Canvas() {
   const stageRef = useRef(null);
+  const containerRef = useRef(null);
   const [isInitialized, setIsInitialized] = useState(false);
   
   // Viewport state (position and scale)
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
   const [stageScale, setStageScale] = useState(1);
+  
+  // Stage dimensions (dynamic based on container)
+  const [stageDimensions, setStageDimensions] = useState({ width: 0, height: 0 });
   
   // Pan state
   const [isDragging, setIsDragging] = useState(false);
@@ -249,8 +253,23 @@ export default function Canvas() {
   // Canvas boundaries and zoom limits
   const CANVAS_WIDTH = 5000;
   const CANVAS_HEIGHT = 5000;
-  const MIN_SCALE = 0.1;
   const MAX_SCALE = 5;
+  
+  // Calculate minimum scale to ensure canvas always fills viewport
+  // This prevents zooming out to see empty space outside the canvas
+  const MIN_SCALE = useMemo(() => {
+    if (stageDimensions.width === 0 || stageDimensions.height === 0) return 0.1;
+    
+    // Calculate scale needed for canvas to fill viewport
+    const scaleToFitWidth = stageDimensions.width / CANVAS_WIDTH;
+    const scaleToFitHeight = stageDimensions.height / CANVAS_HEIGHT;
+    
+    // Use the larger scale to ensure canvas fills viewport in both dimensions
+    const minScale = Math.max(scaleToFitWidth, scaleToFitHeight);
+    
+    // Add a small buffer (0.95x) to allow slight zoom out for UX
+    return Math.max(0.1, minScale * 0.95);
+  }, [stageDimensions, CANVAS_WIDTH, CANVAS_HEIGHT]);
   
   // Spawn configuration: Where users appear when they first load
   // 
@@ -292,16 +311,55 @@ export default function Canvas() {
   }, []);
 
   /**
+   * Update stage dimensions when container resizes
+   */
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const width = containerRef.current.offsetWidth;
+        const height = containerRef.current.offsetHeight;
+        console.log('[Canvas] updateDimensions called:', { width, height });
+        if (width > 0 && height > 0) {
+          setStageDimensions({ width, height });
+          console.log('[Canvas] Stage dimensions set:', { width, height });
+        }
+      } else {
+        console.log('[Canvas] containerRef.current is null');
+      }
+    };
+
+    // Use multiple delays as fallback to ensure container is mounted
+    const timeoutId1 = setTimeout(updateDimensions, 0);
+    const timeoutId2 = setTimeout(updateDimensions, 100);
+    const timeoutId3 = setTimeout(updateDimensions, 500);
+
+    // Watch for resize
+    let resizeObserver;
+    if (containerRef.current) {
+      resizeObserver = new ResizeObserver(updateDimensions);
+      resizeObserver.observe(containerRef.current);
+    }
+
+    return () => {
+      clearTimeout(timeoutId1);
+      clearTimeout(timeoutId2);
+      clearTimeout(timeoutId3);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+    };
+  }, []); // Empty deps - effect runs once on mount
+
+  /**
    * Initialize canvas position - spawn user at center of canvas
    * Flexible for any canvas size and spawn point
    */
   useEffect(() => {
-    if (!stageRef.current || isInitialized) return;
+    if (!stageRef.current || isInitialized || stageDimensions.width === 0) return;
 
     const stage = stageRef.current;
-    const container = stage.container();
-    const viewportWidth = container.offsetWidth;
-    const viewportHeight = container.offsetHeight;
+    const viewportWidth = stageDimensions.width;
+    const viewportHeight = stageDimensions.height;
 
     // Calculate stage position to show spawn point at viewport center
     const initialPos = calculateStagePosition(
@@ -318,7 +376,7 @@ export default function Canvas() {
     
     console.log(`Canvas initialized: User spawned at canvas (${SPAWN_CANVAS_X}, ${SPAWN_CANVAS_Y}) with ${SPAWN_ZOOM * 100}% zoom`);
     console.log(`Stage position: (${Math.round(initialPos.x)}, ${Math.round(initialPos.y)})`);
-  }, [CANVAS_WIDTH, CANVAS_HEIGHT, SPAWN_CANVAS_X, SPAWN_CANVAS_Y, SPAWN_ZOOM, isInitialized, calculateStagePosition]);
+  }, [CANVAS_WIDTH, CANVAS_HEIGHT, SPAWN_CANVAS_X, SPAWN_CANVAS_Y, SPAWN_ZOOM, isInitialized, calculateStagePosition, stageDimensions]);
 
   /**
    * Handle keyboard events (Delete, Copy, Paste, Duplicate)
@@ -575,26 +633,38 @@ export default function Canvas() {
 
   /**
    * Clamp viewport position to stay within canvas boundaries
+   * Ensures users can never pan outside the 5000x5000px canvas
    */
   const clampPosition = useCallback((pos, scale) => {
-    const stage = stageRef.current;
-    if (!stage) return pos;
+    if (stageDimensions.width === 0 || stageDimensions.height === 0) return pos;
 
-    const container = stage.container();
-    const containerWidth = container.offsetWidth;
-    const containerHeight = container.offsetHeight;
+    // Calculate scaled canvas dimensions
+    const scaledCanvasWidth = CANVAS_WIDTH * scale;
+    const scaledCanvasHeight = CANVAS_HEIGHT * scale;
 
-    // Calculate the visible canvas bounds
+    // Calculate boundaries - ensure canvas edges never go past viewport edges
+    // maxX/maxY = 0 means canvas top-left can't go right/down from viewport top-left
+    // minX/minY ensures canvas bottom-right never goes left/up from viewport bottom-right
     const maxX = 0;
-    const minX = -(CANVAS_WIDTH * scale - containerWidth);
+    const minX = Math.min(0, stageDimensions.width - scaledCanvasWidth);
     const maxY = 0;
-    const minY = -(CANVAS_HEIGHT * scale - containerHeight);
+    const minY = Math.min(0, stageDimensions.height - scaledCanvasHeight);
+
+    // If canvas is smaller than viewport (shouldn't happen with MIN_SCALE, but be safe)
+    // Center it instead of allowing panning
+    const clampedX = scaledCanvasWidth < stageDimensions.width 
+      ? (stageDimensions.width - scaledCanvasWidth) / 2 
+      : Math.max(minX, Math.min(maxX, pos.x));
+      
+    const clampedY = scaledCanvasHeight < stageDimensions.height
+      ? (stageDimensions.height - scaledCanvasHeight) / 2
+      : Math.max(minY, Math.min(maxY, pos.y));
 
     return {
-      x: Math.max(minX, Math.min(maxX, pos.x)),
-      y: Math.max(minY, Math.min(maxY, pos.y)),
+      x: clampedX,
+      y: clampedY,
     };
-  }, [CANVAS_WIDTH, CANVAS_HEIGHT]);
+  }, [CANVAS_WIDTH, CANVAS_HEIGHT, stageDimensions]);
 
   /**
    * Handle mouse wheel - Ctrl+scroll = zoom, plain scroll = pan vertical, Shift+scroll = pan horizontal
@@ -609,7 +679,8 @@ export default function Canvas() {
 
     // Ctrl + Scroll = Zoom (centered on cursor)
     if (evt.ctrlKey) {
-    const oldScale = stageScale;
+    // Read LIVE scale from stage, not React state
+    const oldScale = stage.scaleX();
     const pointer = stage.getPointerPosition();
     
     // Get actual stage position (not state, which may lag)
@@ -648,7 +719,9 @@ export default function Canvas() {
     // Apply position clamping to boundaries
     const clampedPos = clampPosition(newPos, clampedScale);
 
-    // Update both scale and position
+    // Apply directly to stage first, then sync to React state
+    stage.scale({ x: clampedScale, y: clampedScale });
+    stage.position(clampedPos);
     setStageScale(clampedScale);
     setStagePos(clampedPos);
     }
@@ -657,12 +730,17 @@ export default function Canvas() {
       const panSpeed = 1;
       const deltaX = evt.deltaY * panSpeed; // Use deltaY for horizontal panning
       
+      // Read LIVE position from stage, not React state (which may be stale)
+      const currentPos = stage.position();
       const newPos = {
-        x: stagePos.x - deltaX,
-        y: stagePos.y
+        x: currentPos.x - deltaX,
+        y: currentPos.y
       };
 
       const clampedPos = clampPosition(newPos, stageScale);
+      
+      // Apply directly to stage, then sync to React state
+      stage.position(clampedPos);
       setStagePos(clampedPos);
     }
     // Plain Scroll = Pan up/down
@@ -670,15 +748,20 @@ export default function Canvas() {
       const panSpeed = 1;
       const deltaY = evt.deltaY * panSpeed;
       
+      // Read LIVE position from stage, not React state (which may be stale)
+      const currentPos = stage.position();
       const newPos = {
-        x: stagePos.x,
-        y: stagePos.y - deltaY
+        x: currentPos.x,
+        y: currentPos.y - deltaY
       };
 
       const clampedPos = clampPosition(newPos, stageScale);
+      
+      // Apply directly to stage, then sync to React state
+      stage.position(clampedPos);
       setStagePos(clampedPos);
     }
-  }, [stageScale, stagePos, clampPosition]);
+  }, [stageScale, clampPosition, MIN_SCALE, MAX_SCALE]);
 
   /**
    * Handle mouse down - start selection box or middle-click pan
@@ -764,15 +847,21 @@ export default function Canvas() {
     // Only handle stage drag end
     if (e.target === stageRef.current) {
       const stage = e.target;
+      
+      // Read LIVE position and scale from stage
       const newPos = {
         x: stage.x(),
         y: stage.y(),
       };
+      const currentScale = stage.scaleX();
 
-      const clampedPos = clampPosition(newPos, stageScale);
+      const clampedPos = clampPosition(newPos, currentScale);
+      
+      // Apply clamped position back to stage, then sync to React state
+      stage.position(clampedPos);
       setStagePos(clampedPos);
     }
-  }, [stageScale, clampPosition]);
+  }, [clampPosition]);
 
   /**
    * Handle mouse move - update cursor position, selection box, and debug display
@@ -1135,8 +1224,8 @@ export default function Canvas() {
         debugData={{
           zoom: stageScale,
           canvasCenter: {
-            x: Math.round((window.innerWidth / 2 - stagePos.x) / stageScale),
-            y: Math.round((window.innerHeight / 2 - stagePos.y) / stageScale)
+            x: Math.round((stageDimensions.width / 2 - stagePos.x) / stageScale),
+            y: Math.round((stageDimensions.height / 2 - stagePos.y) / stageScale)
           },
           cursor: cursorCanvasPosRef.current,
           stageOffset: { x: Math.round(stagePos.x), y: Math.round(stagePos.y) },
@@ -1160,26 +1249,27 @@ export default function Canvas() {
       <AIBannerManager banners={aiBanners} onBannerClose={handleBannerClose} />
       <DisconnectBanner show={showDisconnectBanner} />
       
-      <div className={`canvas-workspace ${placeMode ? 'place-mode' : ''}`}>
-        <Stage
-          ref={stageRef}
-          width={window.innerWidth - 200} // Subtract toolbar width
-          height={window.innerHeight - 60} // Subtract header height
-          x={stagePos.x}
-          y={stagePos.y}
-          scaleX={stageScale}
-          scaleY={stageScale}
-          draggable={!isSelecting} // Disable drag when selecting
-          onWheel={handleWheel}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          onMouseMove={handleMouseMove}
-          onMouseDown={handleMouseDown}
-          onMouseUp={handleMouseUp}
-          onClick={handleStageClick}
-          onTap={handleStageClick}
-          className={isDragging ? 'dragging' : ''}
-        >
+      <div ref={containerRef} className={`canvas-workspace ${placeMode ? 'place-mode' : ''}`}>
+        {stageDimensions.width > 0 && stageDimensions.height > 0 && (
+          <Stage
+            ref={stageRef}
+            width={stageDimensions.width}
+            height={stageDimensions.height}
+            x={stagePos.x}
+            y={stagePos.y}
+            scaleX={stageScale}
+            scaleY={stageScale}
+            draggable={!isSelecting} // Disable drag when selecting
+            onWheel={handleWheel}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onMouseMove={handleMouseMove}
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
+            onClick={handleStageClick}
+            onTap={handleStageClick}
+            className={isDragging ? 'dragging' : ''}
+          >
           <Layer>
             {/* White canvas background - 5000x5000 workspace */}
             <Rect
@@ -1226,6 +1316,7 @@ export default function Canvas() {
             )}
           </Layer>
         </Stage>
+        )}
 
         {/* Render remote cursors - convert canvas coords to screen coords */}
         {cursors.map((cursor) => {
@@ -1240,6 +1331,16 @@ export default function Canvas() {
           // Account for current pan (stage position) and zoom (stage scale)
           const screenX = cursor.x * currentScale + currentPos.x;
           const screenY = cursor.y * currentScale + currentPos.y;
+          
+          // Only render cursors within the visible workspace boundaries
+          // Add some padding (50px) to keep labels visible near edges
+          const isVisible = 
+            screenX >= -50 && 
+            screenX <= stageDimensions.width + 50 &&
+            screenY >= -50 && 
+            screenY <= stageDimensions.height + 50;
+          
+          if (!isVisible) return null;
           
           return (
             <UserCursor

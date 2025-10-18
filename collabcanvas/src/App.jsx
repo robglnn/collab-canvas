@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Auth from './components/Auth';
 import Canvas from './components/Canvas';
 import UserList from './components/UserList';
@@ -32,7 +32,8 @@ function App() {
   const { users, onlineCount, isOwner, wasKicked, kickUser, setUserOfflineBeforeSignout } = usePresence(ownerId);
   
   // Use cursors hook to get removeCursor function for cleanup
-  const onlineUserIds = users.filter(u => u.online).map(u => u.userId);
+  // Memoize onlineUserIds to prevent infinite loop in useCursors dependency array
+  const onlineUserIds = useMemo(() => users.filter(u => u.online).map(u => u.userId), [users]);
   const { removeCursor } = useCursors(onlineUserIds);
   
   // Combined cleanup before signout
