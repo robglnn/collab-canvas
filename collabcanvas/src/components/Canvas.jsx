@@ -52,6 +52,9 @@ export default function Canvas() {
   // RTDB temp updates state (for sub-100ms sync to other users)
   const [tempUpdates, setTempUpdates] = useState({}); // { shapeId: { updates } }
   
+  // Track shapes being dragged by current user (to prevent Firestore conflicts)
+  const [shapesBeingDragged, setShapesBeingDragged] = useState(new Set());
+  
   // Context menu state
   const [contextMenu, setContextMenu] = useState(null);
   
@@ -425,35 +428,35 @@ export default function Canvas() {
   const completeSelection = useCallback(() => {
     if (!isSelecting) return;
 
-    setIsSelecting(false);
+      setIsSelecting(false);
 
-    if (!selectionBox) {
-      return;
-    }
+      if (!selectionBox) {
+        return;
+      }
 
-    // Calculate selection box bounds
-    const box = {
-      x: Math.min(selectionBox.startX, selectionBox.endX),
-      y: Math.min(selectionBox.startY, selectionBox.endY),
-      width: Math.abs(selectionBox.endX - selectionBox.startX),
-      height: Math.abs(selectionBox.endY - selectionBox.startY)
-    };
+      // Calculate selection box bounds
+      const box = {
+        x: Math.min(selectionBox.startX, selectionBox.endX),
+        y: Math.min(selectionBox.startY, selectionBox.endY),
+        width: Math.abs(selectionBox.endX - selectionBox.startX),
+        height: Math.abs(selectionBox.endY - selectionBox.startY)
+      };
 
-    // Find shapes that intersect with selection box
-    const selectedIds = shapes.filter(shape => {
-      if (shape.type === 'circle') {
-        // For circles, check if circle's bounding box intersects with selection box
-        const left = shape.x - shape.radius;
-        const right = shape.x + shape.radius;
-        const top = shape.y - shape.radius;
-        const bottom = shape.y + shape.radius;
-        
-        return (
-          left < box.x + box.width &&
-          right > box.x &&
-          top < box.y + box.height &&
-          bottom > box.y
-        );
+      // Find shapes that intersect with selection box
+      const selectedIds = shapes.filter(shape => {
+        if (shape.type === 'circle') {
+          // For circles, check if circle's bounding box intersects with selection box
+          const left = shape.x - shape.radius;
+          const right = shape.x + shape.radius;
+          const top = shape.y - shape.radius;
+          const bottom = shape.y + shape.radius;
+          
+          return (
+            left < box.x + box.width &&
+            right > box.x &&
+            top < box.y + box.height &&
+            bottom > box.y
+          );
       } else if (shape.type === 'text') {
         // For text, estimate height from fontSize (text doesn't have explicit height)
         const estimatedHeight = (shape.fontSize || 24) * 1.2; // Line height multiplier
@@ -481,29 +484,29 @@ export default function Canvas() {
           lineTop < box.y + box.height &&
           lineBottom > box.y
         );
-      } else {
+        } else {
         // For rectangles and other shapes with width/height
-        return (
-          shape.x < box.x + box.width &&
+          return (
+            shape.x < box.x + box.width &&
           shape.x + (shape.width || 0) > box.x &&
-          shape.y < box.y + box.height &&
+            shape.y < box.y + box.height &&
           shape.y + (shape.height || 0) > box.y
-        );
+          );
+        }
+      }).map(shape => shape.id);
+
+      if (selectedIds.length > 0) {
+        selectShape(selectedIds);
+        
+        // Set flag to prevent the subsequent click event from deselecting
+        // Only set if we actually selected something
+        justCompletedSelectionRef.current = true;
+        setTimeout(() => {
+          justCompletedSelectionRef.current = false;
+        }, 50); // Reset after 50ms (enough time for click event to fire)
       }
-    }).map(shape => shape.id);
 
-    if (selectedIds.length > 0) {
-      selectShape(selectedIds);
-      
-      // Set flag to prevent the subsequent click event from deselecting
-      // Only set if we actually selected something
-      justCompletedSelectionRef.current = true;
-      setTimeout(() => {
-        justCompletedSelectionRef.current = false;
-      }, 50); // Reset after 50ms (enough time for click event to fire)
-    }
-
-    setSelectionBox(null);
+      setSelectionBox(null);
   }, [isSelecting, selectionBox, shapes, selectShape]);
 
   /**
@@ -972,6 +975,17 @@ export default function Canvas() {
       dragSnapshotTakenRef.current = true;
     }
     
+    // Mark this shape (and selected shapes) as being dragged to prevent Firestore conflicts
+    setShapesBeingDragged(prev => {
+      const newSet = new Set(prev);
+      if (selectedShapeIds.length > 1) {
+        selectedShapeIds.forEach(id => newSet.add(id));
+      } else {
+        newSet.add(updatedShape.id);
+      }
+      return newSet;
+    });
+    
     // If this is a selected shape and multiple shapes are selected, move all together
     if (selectedShapeIds.includes(updatedShape.id) && selectedShapeIds.length > 1) {
       // Find the original shape to calculate delta
@@ -1031,6 +1045,9 @@ export default function Canvas() {
   const handleDragEndComplete = useCallback((shapeId) => {
     dragSnapshotTakenRef.current = false;
     
+    // Unmark shapes as being dragged AFTER Firestore write completes
+    const shapesToUnmark = selectedShapeIds.length > 1 ? selectedShapeIds : [shapeId];
+    
     // Write final positions to Firestore
     if (selectedShapeIds.length > 1) {
       // Multi-select: write all selected shapes
@@ -1049,15 +1066,29 @@ export default function Canvas() {
           
           if (Object.keys(updates).length > 0) {
             updateShape(id, updates).then(() => {
-              // After Firestore write succeeds, clear optimistic update
+              // After Firestore write succeeds, clear optimistic update and drag state
               setOptimisticUpdates(prev => {
                 const updated = { ...prev };
                 delete updated[id];
                 return updated;
               });
+              
+              // Wait a bit for Firestore to propagate, then unmark as being dragged
+              setTimeout(() => {
+                setShapesBeingDragged(prev => {
+                  const newSet = new Set(prev);
+                  newSet.delete(id);
+                  return newSet;
+                });
+              }, 500); // 500ms grace period for Firestore propagation
             }).catch((error) => {
               console.error(`Failed to persist shape ${id}:`, error);
-              // Keep optimistic update on error so user can retry
+              // Unmark immediately on error
+              setShapesBeingDragged(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(id);
+                return newSet;
+              });
             });
           }
         }
@@ -1080,15 +1111,29 @@ export default function Canvas() {
         
         if (Object.keys(updates).length > 0) {
           updateShape(shapeId, updates).then(() => {
-            // After Firestore write succeeds, clear optimistic update
+            // After Firestore write succeeds, clear optimistic update and drag state
             setOptimisticUpdates(prev => {
               const updated = { ...prev };
               delete updated[shapeId];
               return updated;
             });
+            
+            // Wait a bit for Firestore to propagate, then unmark as being dragged
+            setTimeout(() => {
+              setShapesBeingDragged(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(shapeId);
+                return newSet;
+              });
+            }, 500); // 500ms grace period for Firestore propagation
           }).catch((error) => {
             console.error(`Failed to persist shape ${shapeId}:`, error);
-            // Keep optimistic update on error so user can retry
+            // Unmark immediately on error
+            setShapesBeingDragged(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(shapeId);
+              return newSet;
+            });
           });
         }
       }
@@ -1142,17 +1187,31 @@ export default function Canvas() {
   }
 
   // Apply optimistic updates and RTDB temp updates to shapes
-  // Priority: optimisticUpdates (local) > tempUpdates (RTDB from others) > shapes (Firestore)
-  const shapesWithOptimisticUpdates = shapes.map(shape => {
-    const rtdbUpdate = tempUpdates[shape.id] || {};
-    const localUpdate = optimisticUpdates[shape.id] || {};
-    
-    // Merge: base shape + RTDB updates + local optimistic updates
-    return { 
-      ...shape, 
-      ...rtdbUpdate, // Apply RTDB temp updates from other users
-      ...localUpdate // Apply local optimistic updates (highest priority)
-    };
+  // CRITICAL: Only apply local optimistic updates to shapes current user is manipulating!
+  // For other shapes, show RTDB temp updates from other users
+  const shapesWithOptimisticUpdates = shapes
+    .filter(shape => !shapesBeingDragged.has(shape.id) || user?.uid === shape.lockedBy) // Filter out shapes being dragged by Firestore until drag completes
+    .map(shape => {
+      const rtdbUpdate = tempUpdates[shape.id] || {};
+      const localUpdate = optimisticUpdates[shape.id] || {};
+      
+      // If current user is manipulating this shape, show local optimistic updates
+      // Otherwise, show RTDB temp updates from other users
+      const isLocallyManipulated = Object.keys(localUpdate).length > 0;
+      
+      if (isLocallyManipulated) {
+        // Current user is dragging: show local optimistic updates only
+        return { 
+          ...shape, 
+          ...localUpdate // Local user sees their own changes instantly
+        };
+      } else {
+        // Other users are dragging: show their RTDB temp updates
+        return { 
+          ...shape, 
+          ...rtdbUpdate // Remote users' real-time updates
+        };
+      }
   });
 
   // Get selected shapes for Toolbar (with optimistic updates applied)
