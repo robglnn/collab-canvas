@@ -1025,49 +1025,71 @@ export default function Canvas() {
   };
 
   /**
-   * Handle drag/transform end - write to Firestore, clear optimistic + RTDB temp updates
+   * Handle drag/transform end - write to Firestore and clear RTDB temp updates
+   * IMPORTANT: Don't clear optimistic updates immediately - let Firestore listener override them
    */
-  const handleDragEndComplete = useCallback(async (shapeId) => {
+  const handleDragEndComplete = useCallback((shapeId) => {
     dragSnapshotTakenRef.current = false;
     
     // Write final positions to Firestore
     if (selectedShapeIds.length > 1) {
       // Multi-select: write all selected shapes
-      const writePromises = selectedShapeIds.map(id => {
+      selectedShapeIds.forEach(id => {
         const optimisticUpdate = optimisticUpdates[id];
         if (optimisticUpdate) {
-          return updateShape(id, optimisticUpdate);
+          // Get the full shape with optimistic updates applied
+          const currentShape = shapes.find(s => s.id === id);
+          if (currentShape) {
+            const finalShape = { ...currentShape, ...optimisticUpdate };
+            // Write complete shape to Firestore
+            updateShape(id, {
+              x: finalShape.x,
+              y: finalShape.y,
+              width: finalShape.width,
+              height: finalShape.height,
+              rotation: finalShape.rotation,
+            }).then(() => {
+              // After Firestore write succeeds, clear optimistic update
+              setOptimisticUpdates(prev => {
+                const updated = { ...prev };
+                delete updated[id];
+                return updated;
+              });
+            });
+          }
         }
-        return Promise.resolve();
+        // Clear RTDB temp update immediately (ephemeral data)
+        clearTempUpdate(id);
       });
-      
-      await Promise.all(writePromises);
-      
-      // Clear optimistic updates and RTDB temp updates
-      setOptimisticUpdates(prev => {
-        const updated = { ...prev };
-        selectedShapeIds.forEach(id => delete updated[id]);
-        return updated;
-      });
-      
-      selectedShapeIds.forEach(id => clearTempUpdate(id));
     } else if (shapeId) {
       // Single shape: write to Firestore
       const optimisticUpdate = optimisticUpdates[shapeId];
       if (optimisticUpdate) {
-        await updateShape(shapeId, optimisticUpdate);
+        // Get the full shape with optimistic updates applied
+        const currentShape = shapes.find(s => s.id === shapeId);
+        if (currentShape) {
+          const finalShape = { ...currentShape, ...optimisticUpdate };
+          // Write complete shape to Firestore
+          updateShape(shapeId, {
+            x: finalShape.x,
+            y: finalShape.y,
+            width: finalShape.width,
+            height: finalShape.height,
+            rotation: finalShape.rotation,
+          }).then(() => {
+            // After Firestore write succeeds, clear optimistic update
+            setOptimisticUpdates(prev => {
+              const updated = { ...prev };
+              delete updated[shapeId];
+              return updated;
+            });
+          });
+        }
       }
-      
-      // Clear optimistic update and RTDB temp update
-      setOptimisticUpdates(prev => {
-        const updated = { ...prev };
-        delete updated[shapeId];
-        return updated;
-      });
-      
+      // Clear RTDB temp update immediately (ephemeral data)
       clearTempUpdate(shapeId);
     }
-  }, [selectedShapeIds, optimisticUpdates, updateShape, clearTempUpdate]);
+  }, [selectedShapeIds, optimisticUpdates, shapes, updateShape, clearTempUpdate]);
 
   /**
    * Handle shape right-click
