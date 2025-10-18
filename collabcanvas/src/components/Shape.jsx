@@ -285,6 +285,8 @@ const Shape = memo(function Shape({
             text={shape.text || 'Double-click to edit'}
             fontSize={shape.fontSize || 24}
             fontFamily={shape.fontFamily || 'Arial'}
+            fontStyle={shape.fontStyle || 'normal'}
+            textDecoration={shape.textDecoration || 'none'}
             width={shape.width || 200}
             align={shape.align || 'left'}
           />

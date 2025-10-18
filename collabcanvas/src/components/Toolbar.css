@@ -68,7 +68,7 @@
   flex-shrink: 0;
 }
 
-/* Line Width Controls */
+/* Line Width Controls & Text Controls */
 .toolbar-label {
   display: flex;
   flex-direction: column;
@@ -76,6 +76,42 @@
   font-size: 0.875rem;
   font-weight: 500;
   color: #333;
+}
+
+/* Font Selector Dropdown */
+.font-selector {
+  width: 100%;
+  padding: 0.5rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.font-selector:hover {
+  border-color: #667eea;
+}
+
+.font-selector:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+/* Text Style Buttons (Bold, Underline) */
+.text-style-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.toolbar-btn-small {
+  flex: 1;
+  padding: 0.5rem;
+  margin-bottom: 0;
+  min-height: 40px;
+  font-size: 1.1rem;
 }
 
 .line-width-slider {

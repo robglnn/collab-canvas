@@ -121,6 +121,43 @@ export default function Canvas() {
     };
   }, []);
 
+  // Expose updateTextFormatting function to Toolbar (for text formatting changes)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.updateTextFormatting = (formatting) => {
+        // Update place mode options for new text
+        setPlaceModeOptions(prev => ({ ...prev, ...formatting }));
+        
+        // Apply to selected text shapes
+        if (selectedShapeIds.length > 0) {
+          takeSnapshot(shapes); // Take snapshot before modifying
+          selectedShapeIds.forEach(shapeId => {
+            const shape = shapes.find(s => s.id === shapeId);
+            if (shape && shape.type === 'text') {
+              const updates = {};
+              if (formatting.fontFamily !== undefined) {
+                updates.fontFamily = formatting.fontFamily;
+              }
+              if (formatting.isBold !== undefined) {
+                updates.fontStyle = formatting.isBold ? 'bold' : 'normal';
+              }
+              if (formatting.isUnderline !== undefined) {
+                updates.textDecoration = formatting.isUnderline ? 'underline' : 'none';
+              }
+              updateShape(shapeId, updates);
+            }
+          });
+        }
+      };
+    }
+    
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.updateTextFormatting = undefined;
+      }
+    };
+  }, [selectedShapeIds, shapes, updateShape, takeSnapshot]);
+
   // Create AI-specific shape update function that skips RTDB for batch operations
   const updateShapeForAI = useCallback(async (shapeId, updates) => {
     // AI operations skip RTDB to avoid performance overhead
@@ -800,6 +837,10 @@ export default function Canvas() {
         const pointerPos = stage.getPointerPosition();
         const canvasPos = screenToCanvas(pointerPos, stage);
 
+        const fontFamily = placeModeOptions?.fontFamily || 'Arial';
+        const isBold = placeModeOptions?.isBold || false;
+        const isUnderline = placeModeOptions?.isUnderline || false;
+
         const newShape = {
           id: `shape-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           type: 'text',
@@ -807,7 +848,9 @@ export default function Canvas() {
           y: canvasPos.y,
           text: 'Double-click to edit',
           fontSize: 24,
-          fontFamily: 'Arial',
+          fontFamily: fontFamily,
+          fontStyle: isBold ? 'bold' : 'normal',
+          textDecoration: isUnderline ? 'underline' : 'none',
           width: 200,
           rotation: 0,
         };

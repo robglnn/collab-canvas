@@ -14,14 +14,23 @@ import './Toolbar.css';
  * @param {Function} onToggleDebug - Callback to toggle debug panel
  * @param {ReactNode} children - Optional children (e.g., AI Command Bar)
  */
-export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLineWidth, debugData, isDebugExpanded, onToggleDebug, children }) {
+export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLineWidth, onLineWidthInput, debugData, isDebugExpanded, onToggleDebug, children }) {
   const [isPlaceMode, setIsPlaceMode] = useState(false);
   const [activeShape, setActiveShape] = useState(null);
   const [lineWidth, setLineWidth] = useState(3);
   const [tempLineWidth, setTempLineWidth] = useState(null); // Temporary width while dragging
 
+  // Text formatting state
+  const [fontFamily, setFontFamily] = useState('Arial');
+  const [isBold, setIsBold] = useState(false);
+  const [isUnderline, setIsUnderline] = useState(false);
+
   // Check if a single line is selected
   const selectedLine = selectedShapes.length === 1 && selectedShapes[0].type === 'line' ? selectedShapes[0] : null;
+
+  // Check if text shapes are selected
+  const selectedTextShapes = selectedShapes.filter(s => s.type === 'text');
+  const hasTextSelected = selectedTextShapes.length > 0;
 
   // Get the current width to display
   const displayWidth = tempLineWidth !== null 
@@ -57,7 +66,7 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
   const handleTextClick = () => {
     setIsPlaceMode(true);
     setActiveShape('text');
-    onCreateShape('text');
+    onCreateShape('text', { fontFamily, isBold, isUnderline });
     console.log('Place mode activated: text');
   };
 
@@ -191,6 +200,60 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
               className="line-width-slider"
             />
           </label>
+        </div>
+      )}
+
+      {/* Text Formatting Controls - Show when creating text OR when text is selected */}
+      {((isPlaceMode && activeShape === 'text') || hasTextSelected) && (
+        <div className="toolbar-section">
+          <h3 className="toolbar-title">Text Formatting</h3>
+          
+          {/* Font Family Selector */}
+          <label className="toolbar-label">
+            Font
+            <select
+              value={fontFamily}
+              onChange={(e) => {
+                setFontFamily(e.target.value);
+                if (typeof window !== 'undefined' && window.updateTextFormatting) {
+                  window.updateTextFormatting({ fontFamily: e.target.value });
+                }
+              }}
+              className="font-selector"
+            >
+              <option value="Arial">Arial</option>
+              <option value="Times New Roman">Times New Roman</option>
+              <option value="Papyrus">Papyrus</option>
+            </select>
+          </label>
+
+          {/* Bold and Underline Toggles */}
+          <div className="text-style-buttons">
+            <button
+              className={`toolbar-btn toolbar-btn-small ${isBold ? 'active' : ''}`}
+              onClick={() => {
+                setIsBold(!isBold);
+                if (typeof window !== 'undefined' && window.updateTextFormatting) {
+                  window.updateTextFormatting({ isBold: !isBold });
+                }
+              }}
+              title="Bold"
+            >
+              <span style={{ fontWeight: 'bold' }}>B</span>
+            </button>
+            <button
+              className={`toolbar-btn toolbar-btn-small ${isUnderline ? 'active' : ''}`}
+              onClick={() => {
+                setIsUnderline(!isUnderline);
+                if (typeof window !== 'undefined' && window.updateTextFormatting) {
+                  window.updateTextFormatting({ isUnderline: !isUnderline });
+                }
+              }}
+              title="Underline"
+            >
+              <span style={{ textDecoration: 'underline' }}>U</span>
+            </button>
+          </div>
         </div>
       )}
 
