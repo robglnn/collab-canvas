@@ -151,9 +151,9 @@ const Shape = memo(function Shape({
       });
     }
     
-    // Notify parent that drag is complete
+    // Notify parent that drag is complete (pass shapeId to clear RTDB temp updates)
     if (onDragEndComplete) {
-      onDragEndComplete();
+      onDragEndComplete(shape.id);
     }
   };
 
@@ -219,9 +219,9 @@ const Shape = memo(function Shape({
       });
     }
     
-    // Notify parent that transform is complete
+    // Notify parent that transform is complete (pass shapeId to clear RTDB temp updates)
     if (onDragEndComplete) {
-      onDragEndComplete();
+      onDragEndComplete(shape.id);
     }
   };
 

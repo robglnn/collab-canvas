@@ -957,6 +957,7 @@ export default function Canvas() {
 
   /**
    * Handle shape change (move, resize) - supports multi-shape movement
+   * Now with real-time RTDB updates for live collaborative dragging!
    */
   const handleShapeChange = (updatedShape) => {
     // Take snapshot before first change in a drag/transform session
@@ -977,26 +978,53 @@ export default function Canvas() {
         selectedShapeIds.forEach(shapeId => {
           const shape = shapes.find(s => s.id === shapeId);
           if (shape) {
-            updateShape(shapeId, {
+            const updates = {
               ...shape,
               x: shape.x + deltaX,
               y: shape.y + deltaY,
-            });
+            };
+            
+            // 1. Optimistic local update (via updateShape)
+            updateShape(shapeId, updates);
+            
+            // 2. Send to RTDB for real-time sync to other users (sub-100ms)
+            writeTempUpdate(shapeId, { x: updates.x, y: updates.y });
           }
         });
       }
     } else {
       // Single shape update
+      
+      // 1. Optimistic local update
       updateShape(updatedShape.id, updatedShape);
+      
+      // 2. Send to RTDB for real-time sync to other users (sub-100ms)
+      writeTempUpdate(updatedShape.id, { 
+        x: updatedShape.x, 
+        y: updatedShape.y,
+        // Include other transform properties if they changed
+        ...(updatedShape.width !== undefined && { width: updatedShape.width }),
+        ...(updatedShape.height !== undefined && { height: updatedShape.height }),
+        ...(updatedShape.rotation !== undefined && { rotation: updatedShape.rotation }),
+        ...(updatedShape.scaleX !== undefined && { scaleX: updatedShape.scaleX }),
+        ...(updatedShape.scaleY !== undefined && { scaleY: updatedShape.scaleY }),
+      });
     }
   };
 
   /**
-   * Handle drag/transform end - reset snapshot flag
+   * Handle drag/transform end - reset snapshot flag and clear RTDB temp updates
    */
-  const handleDragEndComplete = useCallback(() => {
+  const handleDragEndComplete = useCallback((shapeId) => {
     dragSnapshotTakenRef.current = false;
-  }, []);
+    
+    // Clear RTDB temp updates for this shape (and all selected shapes if multi-select)
+    if (selectedShapeIds.length > 1) {
+      selectedShapeIds.forEach(id => clearTempUpdate(id));
+    } else if (shapeId) {
+      clearTempUpdate(shapeId);
+    }
+  }, [selectedShapeIds, clearTempUpdate]);
 
   /**
    * Handle shape right-click
