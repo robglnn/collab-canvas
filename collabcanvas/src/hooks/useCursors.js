@@ -4,7 +4,8 @@ import {
   onValue, 
   set,
   remove,
-  off 
+  off,
+  onDisconnect
 } from 'firebase/database';
 import { database } from '../lib/firebase';
 import { useAuth } from './useAuth';
@@ -111,6 +112,11 @@ export function useCursors(onlineUserIds = []) {
         photoURL: user.photoURL || null,
         timestamp: now, // Use client timestamp for latency measurement
       });
+      
+      // Set up automatic cleanup on disconnect (only needs to be set once, but safe to call multiple times)
+      onDisconnect(cursorRef).remove().catch((err) => {
+        console.error('[RTDB] Error setting onDisconnect for cursor:', err);
+      });
     } catch (error) {
       console.error('[RTDB] Error updating cursor position:', error);
       // Fail silently - cursor updates are not critical
@@ -163,46 +169,6 @@ export function useCursors(onlineUserIds = []) {
       setCursors(filteredCursors);
     }
   }, [allCursors, onlineUserIds]);
-
-  // Clean up stale cursors on mount (remove cursors from offline users)
-  useEffect(() => {
-    if (!user || onlineUserIds.length === 0) return;
-
-    const cleanupStaleCursors = async () => {
-      try {
-        const cursorsRef = ref(database, `cursors/${CANVAS_ID}`);
-        const snapshot = await new Promise((resolve, reject) => {
-          onValue(cursorsRef, resolve, reject, { onlyOnce: true });
-        });
-        
-        const cursorsData = snapshot.val();
-        if (!cursorsData) return;
-        
-        const onlineUserIdSet = new Set(onlineUserIds);
-        const deletePromises = [];
-        
-        Object.keys(cursorsData).forEach((userId) => {
-          // If cursor belongs to offline user, delete it
-          if (!onlineUserIdSet.has(userId)) {
-            console.log(`[RTDB] Deleting stale cursor for offline user: ${userId}`);
-            const cursorRef = ref(database, `cursors/${CANVAS_ID}/${userId}`);
-            deletePromises.push(remove(cursorRef));
-          }
-        });
-        
-        if (deletePromises.length > 0) {
-          await Promise.all(deletePromises);
-          console.log(`[RTDB] Cleaned up ${deletePromises.length} stale cursors`);
-        }
-      } catch (error) {
-        console.error('[RTDB] Error cleaning up stale cursors:', error);
-      }
-    };
-
-    // Run cleanup after a short delay to let presence data load
-    const timer = setTimeout(cleanupStaleCursors, 2000);
-    return () => clearTimeout(timer);
-  }, [user, onlineUserIds]);
 
   // Clean up cursor on unmount
   useEffect(() => {
