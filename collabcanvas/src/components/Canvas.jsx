@@ -49,12 +49,6 @@ export default function Canvas() {
   // Optimistic updates state (for instant UI feedback)
   const [optimisticUpdates, setOptimisticUpdates] = useState({}); // { shapeId: { updates } }
   
-  // RTDB temp updates state (for sub-100ms sync to other users)
-  const [tempUpdates, setTempUpdates] = useState({}); // { shapeId: { updates } }
-  
-  // Track shapes being dragged by current user (to prevent Firestore conflicts)
-  const [shapesBeingDragged, setShapesBeingDragged] = useState(new Set());
-  
   // Context menu state
   const [contextMenu, setContextMenu] = useState(null);
   
@@ -103,27 +97,8 @@ export default function Canvas() {
   // Cursors hook - pass online user IDs to filter cursors
   const { cursors, updateCursorPosition, removeCursor } = useCursors(onlineUserIds);
 
-  // RTDB hook for temporary updates (sub-100ms sync)
-  const { writeTempUpdate, subscribeTempUpdates, clearTempUpdate } = useRTDB('main');
-  
-  // Subscribe to RTDB temp updates from other users
-  useEffect(() => {
-    if (!user) return; // Only subscribe when user is authenticated
-    
-    const unsubscribe = subscribeTempUpdates((updates) => {
-      // Log when temp updates are received for debugging
-      const updateCount = Object.keys(updates).length;
-      if (updateCount > 0) {
-        console.log(`[RTDB] Received ${updateCount} temp shape update(s) from other users`);
-      }
-      setTempUpdates(updates);
-    });
-    
-    return () => {
-      unsubscribe();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array - subscribeTempUpdates is stable
+  // Note: RTDB temp updates for shapes temporarily disabled for reliability
+  // Will be re-enabled in Option B with proper debouncing
 
   // History hook for undo/redo
   const { canUndo, canRedo, takeSnapshot, undo, redo, clearHistory } = useHistory();
@@ -965,8 +940,7 @@ export default function Canvas() {
 
   /**
    * Handle shape change (move, resize) - supports multi-shape movement
-   * Now with real-time RTDB updates for live collaborative dragging!
-   * IMPORTANT: Only updates local optimistic state + RTDB during drag (no Firestore writes)
+   * OPTION A: Simple optimistic updates + immediate Firestore writes
    */
   const handleShapeChange = (updatedShape) => {
     // Take snapshot before first change in a drag/transform session
@@ -974,17 +948,6 @@ export default function Canvas() {
       takeSnapshot(shapes);
       dragSnapshotTakenRef.current = true;
     }
-    
-    // Mark this shape (and selected shapes) as being dragged to prevent Firestore conflicts
-    setShapesBeingDragged(prev => {
-      const newSet = new Set(prev);
-      if (selectedShapeIds.length > 1) {
-        selectedShapeIds.forEach(id => newSet.add(id));
-      } else {
-        newSet.add(updatedShape.id);
-      }
-      return newSet;
-    });
     
     // If this is a selected shape and multiple shapes are selected, move all together
     if (selectedShapeIds.includes(updatedShape.id) && selectedShapeIds.length > 1) {
@@ -998,43 +961,17 @@ export default function Canvas() {
         selectedShapeIds.forEach(shapeId => {
           const shape = shapes.find(s => s.id === shapeId);
           if (shape) {
-            const updates = {
+            updateShape(shapeId, {
+              ...shape,
               x: shape.x + deltaX,
               y: shape.y + deltaY,
-            };
-            
-            // 1. Local optimistic update (instant visual feedback, NO Firestore write)
-            setOptimisticUpdates(prev => ({
-              ...prev,
-              [shapeId]: { ...prev[shapeId], ...updates }
-            }));
-            
-            // 2. Send to RTDB for real-time sync to other users (sub-100ms)
-            writeTempUpdate(shapeId, updates);
+            });
           }
         });
       }
     } else {
       // Single shape update
-      const updates = {
-        x: updatedShape.x,
-        y: updatedShape.y,
-        // Include other transform properties if they changed
-        ...(updatedShape.width !== undefined && { width: updatedShape.width }),
-        ...(updatedShape.height !== undefined && { height: updatedShape.height }),
-        ...(updatedShape.rotation !== undefined && { rotation: updatedShape.rotation }),
-        ...(updatedShape.scaleX !== undefined && { scaleX: updatedShape.scaleX }),
-        ...(updatedShape.scaleY !== undefined && { scaleY: updatedShape.scaleY }),
-      };
-      
-      // 1. Local optimistic update (instant visual feedback, NO Firestore write)
-      setOptimisticUpdates(prev => ({
-        ...prev,
-        [updatedShape.id]: { ...prev[updatedShape.id], ...updates }
-      }));
-      
-      // 2. Send to RTDB for real-time sync to other users (sub-100ms)
-      writeTempUpdate(updatedShape.id, updates);
+      updateShape(updatedShape.id, updatedShape);
     }
   };
 
@@ -1186,30 +1123,15 @@ export default function Canvas() {
     );
   }
 
-  // Apply optimistic updates and RTDB temp updates to shapes
-  // CRITICAL: Only apply local optimistic updates to shapes current user is manipulating!
-  // For other shapes, show RTDB temp updates from other users
+  // Apply optimistic updates to shapes (simple and reliable)
   const shapesWithOptimisticUpdates = shapes.map(shape => {
-    const rtdbUpdate = tempUpdates[shape.id] || {};
     const localUpdate = optimisticUpdates[shape.id] || {};
     
-    // If current user is manipulating this shape, show local optimistic updates
-    // Otherwise, show RTDB temp updates from other users
-    const isLocallyManipulated = Object.keys(localUpdate).length > 0;
-    
-    if (isLocallyManipulated) {
-      // Current user is dragging: show local optimistic updates only
-      return { 
-        ...shape, 
-        ...localUpdate // Local user sees their own changes instantly
-      };
-    } else {
-      // Other users are dragging: show their RTDB temp updates
-      return { 
-        ...shape, 
-        ...rtdbUpdate // Remote users' real-time updates
-      };
-    }
+    // Merge base shape with optimistic updates
+    return { 
+      ...shape, 
+      ...localUpdate
+    };
   });
 
   // Get selected shapes for Toolbar (with optimistic updates applied)
