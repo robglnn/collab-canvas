@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { useFirestore } from './useFirestore';
 import { useAuth } from './useAuth';
@@ -71,15 +71,27 @@ export function useCanvas() {
     }
   }, [user, canvasMetadata]);
 
+  // Track shapes ref to avoid dependency issues
+  const shapesRef = useRef(shapes);
+  useEffect(() => {
+    shapesRef.current = shapes;
+  }, [shapes]);
+
   /**
    * Cleanup locks from offline users
    * Periodically checks locked shapes and releases locks if user is offline
    */
   useEffect(() => {
-    if (!user || shapes.length === 0) return;
+    if (!user) return;
+
+    // Track recently unlocked shapes to avoid redundant unlocks
+    const recentlyUnlocked = new Set();
 
     const cleanupLocks = async () => {
       try {
+        const currentShapes = shapesRef.current;
+        if (currentShapes.length === 0) return;
+
         // Get all presence documents to check who's online
         const presenceRef = collection(db, 'canvases', 'main', 'presence');
         const presenceSnapshot = await getDocs(presenceRef);
@@ -93,10 +105,20 @@ export function useCanvas() {
         });
 
         // Check each locked shape
-        for (const shape of shapes) {
+        for (const shape of currentShapes) {
           if (shape.lockedBy && !onlineUserIds.has(shape.lockedBy)) {
+            // Skip if we recently unlocked this shape
+            const unlockKey = `${shape.id}-${shape.lockedBy}`;
+            if (recentlyUnlocked.has(unlockKey)) {
+              continue;
+            }
+
             console.log(`Unlocking shape ${shape.id} - user ${shape.lockedBy} is offline`);
             await unlockShapeInFirestore(shape.id);
+            
+            // Mark as recently unlocked for 10 seconds
+            recentlyUnlocked.add(unlockKey);
+            setTimeout(() => recentlyUnlocked.delete(unlockKey), 10000);
           }
         }
       } catch (error) {
@@ -107,11 +129,14 @@ export function useCanvas() {
     // Run cleanup every 5 seconds
     const interval = setInterval(cleanupLocks, 5000);
     
-    // Also run immediately
-    cleanupLocks();
+    // Also run after a short delay (not immediately to let presence load)
+    const initialTimer = setTimeout(cleanupLocks, 2000);
 
-    return () => clearInterval(interval);
-  }, [user, shapes]);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(initialTimer);
+    };
+  }, [user]); // Only depend on user, not shapes
 
   /**
    * Add a new shape with optimistic update
