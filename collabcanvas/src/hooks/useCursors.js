@@ -28,16 +28,11 @@ const THROTTLE_MS = 50; // 20 updates per second (sub-50ms target)
  */
 export function useCursors(onlineUserIds = []) {
   const { user } = useAuth();
-  const [allCursors, setAllCursors] = useState([]);
   const [cursors, setCursors] = useState([]);
   
   // Throttle state
   const lastUpdateRef = useRef(0);
   const pendingUpdateRef = useRef(null);
-  
-  // Track previous cursor count and IDs for logging and comparison (avoid accessing state inside effect)
-  const prevCursorCountRef = useRef(0);
-  const prevCursorIdsRef = useRef('');
 
   // Subscribe to cursors in RTDB
   useEffect(() => {
@@ -50,22 +45,27 @@ export function useCursors(onlineUserIds = []) {
     const handleCursorsUpdate = (snapshot) => {
       const remoteCursors = [];
       const cursorsData = snapshot.val();
+      const onlineUserIdSet = new Set(onlineUserIds);
       
       if (cursorsData) {
         Object.entries(cursorsData).forEach(([userId, cursorData]) => {
           // Filter out current user's cursor
           if (userId !== user.uid) {
-            remoteCursors.push({
-              userId,
-              ...cursorData,
-            });
-            console.log(`[RTDB] Cursor update for ${cursorData.userName}: (${Math.round(cursorData.x)}, ${Math.round(cursorData.y)})`);
+            // Apply online filter immediately (no second state update needed)
+            if (onlineUserIds.length === 0 || onlineUserIdSet.has(userId)) {
+              remoteCursors.push({
+                userId,
+                ...cursorData,
+              });
+              console.log(`[RTDB] Cursor update for ${cursorData.userName}: (${Math.round(cursorData.x)}, ${Math.round(cursorData.y)})`);
+            }
           }
         });
       }
       
-      setAllCursors(remoteCursors);
-      console.log('[RTDB] All remote cursors:', remoteCursors.length);
+      // Single state update - no delay!
+      setCursors(remoteCursors);
+      console.log('[RTDB] Filtered cursors set:', remoteCursors.length);
     };
     
     // Subscribe to RTDB value changes
@@ -77,7 +77,7 @@ export function useCursors(onlineUserIds = []) {
       console.log('[RTDB] Cleaning up cursor subscription...');
       off(cursorsRef, 'value', handleCursorsUpdate);
     };
-  }, [user]);
+  }, [user, onlineUserIds]); // Added onlineUserIds to dependencies
 
   /**
    * Update cursor position with throttling to RTDB
@@ -140,36 +140,8 @@ export function useCursors(onlineUserIds = []) {
     }
   }, [user]);
 
-  // Filter cursors to only show online users
-  useEffect(() => {
-    if (onlineUserIds.length === 0) {
-      // No presence data yet, show all cursors temporarily
-      setCursors(allCursors);
-      prevCursorIdsRef.current = '';
-      return;
-    }
-
-    const onlineUserIdSet = new Set(onlineUserIds);
-    const filteredCursors = allCursors.filter(cursor => 
-      onlineUserIdSet.has(cursor.userId)
-    );
-    
-    // Only update state if the filtered cursor list actually changed
-    // Compare by serializing to avoid unnecessary re-renders
-    const currentIds = filteredCursors.map(c => c.userId).sort().join(',');
-    
-    if (currentIds !== prevCursorIdsRef.current) {
-      // Only log when cursor count actually changes
-      const newCount = filteredCursors.length;
-      if (newCount !== prevCursorCountRef.current) {
-        console.log(`Filtered cursors: ${newCount} online out of ${allCursors.length} total`);
-        prevCursorCountRef.current = newCount;
-      }
-      
-      prevCursorIdsRef.current = currentIds;
-      setCursors(filteredCursors);
-    }
-  }, [allCursors, onlineUserIds]);
+  // Note: Filtering now happens directly in handleCursorsUpdate for instant updates
+  // No separate filtering effect needed - avoids double state update delay
 
   // Clean up cursor on unmount
   useEffect(() => {
