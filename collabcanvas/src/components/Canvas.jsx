@@ -105,6 +105,8 @@ export default function Canvas() {
   
   // Subscribe to RTDB temp updates from other users
   useEffect(() => {
+    if (!user) return; // Only subscribe when user is authenticated
+    
     const unsubscribe = subscribeTempUpdates((updates) => {
       setTempUpdates(updates);
     });
@@ -112,7 +114,8 @@ export default function Canvas() {
     return () => {
       unsubscribe();
     };
-  }, [subscribeTempUpdates]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array - subscribeTempUpdates is stable
 
   // History hook for undo/redo
   const { canUndo, canRedo, takeSnapshot, undo, redo, clearHistory } = useHistory();

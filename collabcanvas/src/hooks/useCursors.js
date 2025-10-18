@@ -144,10 +144,13 @@ export function useCursors(onlineUserIds = []) {
     
     setCursors(filteredCursors);
     // Only log when cursor count actually changes
-    if (filteredCursors.length !== cursors.length) {
-      console.log(`Filtered cursors: ${filteredCursors.length} online out of ${allCursors.length} total`);
+    const prevCount = cursors.length;
+    const newCount = filteredCursors.length;
+    if (newCount !== prevCount) {
+      console.log(`Filtered cursors: ${newCount} online out of ${allCursors.length} total`);
     }
-  }, [allCursors, onlineUserIds, cursors.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allCursors, onlineUserIds]); // Removed cursors.length from dependencies to prevent loop
 
   // Clean up stale cursors on mount (remove cursors from offline users)
   useEffect(() => {
