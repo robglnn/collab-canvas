@@ -57,11 +57,20 @@ function UserCursor({ cursor }) {
 // Export memoized component to prevent unnecessary re-renders
 // Only re-render if cursor position or name changes
 export default memo(UserCursor, (prevProps, nextProps) => {
-  return (
+  // Return TRUE if props are equal (skip re-render)
+  // Return FALSE if props are different (do re-render)
+  const shouldSkipRender = (
     prevProps.cursor.userId === nextProps.cursor.userId &&
     prevProps.cursor.x === nextProps.cursor.x &&
     prevProps.cursor.y === nextProps.cursor.y &&
     prevProps.cursor.userName === nextProps.cursor.userName
   );
+  
+  // Debug log when cursor position changes
+  if (!shouldSkipRender) {
+    console.log(`[UserCursor] Re-rendering ${nextProps.cursor.userName}: (${Math.round(nextProps.cursor.x)}, ${Math.round(nextProps.cursor.y)})`);
+  }
+  
+  return shouldSkipRender;
 });
 

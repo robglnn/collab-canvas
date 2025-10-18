@@ -1159,6 +1159,9 @@ export default function Canvas() {
           const screenX = cursor.x * currentScale + currentPos.x;
           const screenY = cursor.y * currentScale + currentPos.y;
           
+          // Debug log to see if rendering with new coordinates
+          console.log(`[Canvas] Rendering cursor for ${cursor.userName}: canvas=(${Math.round(cursor.x)}, ${Math.round(cursor.y)}) screen=(${Math.round(screenX)}, ${Math.round(screenY)})`);
+          
           return (
             <UserCursor
               key={cursor.userId}
