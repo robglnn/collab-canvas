@@ -190,6 +190,23 @@ const Shape = memo(function Shape({
         width: Math.max(20, node.width() * scaleX),
         rotation: 0, // Don't allow rotation for text in basic version
       });
+    } else if (shape.type === 'line') {
+      // For lines, apply scale to points array to stretch/shrink the line
+      const oldPoints = shape.points || [0, 0, 100, 100];
+      const newPoints = [
+        oldPoints[0] * scaleX, // x1
+        oldPoints[1] * scaleY, // y1
+        oldPoints[2] * scaleX, // x2
+        oldPoints[3] * scaleY, // y2
+      ];
+      
+      onChange({
+        ...shape,
+        x: node.x(),
+        y: node.y(),
+        points: newPoints,
+        // Lines don't use rotation from transformer
+      });
     } else {
       // For rectangles, update width/height
       onChange({
@@ -303,12 +320,12 @@ const Shape = memo(function Shape({
         )}
       </Group>
       
-      {isSelected && canEdit && shape.type !== 'line' && (
+      {isSelected && canEdit && (
         <Transformer
           ref={transformerRef}
           boundBoxFunc={(oldBox, newBox) => {
             // Limit minimum size
-            const minSize = shape.type === 'circle' ? 10 : shape.type === 'text' ? 20 : 5;
+            const minSize = shape.type === 'circle' ? 10 : shape.type === 'text' ? 20 : shape.type === 'line' ? 5 : 5;
             if (newBox.width < minSize || newBox.height < minSize) {
               return oldBox;
             }
@@ -319,10 +336,12 @@ const Shape = memo(function Shape({
               ? ['top-left', 'top-right', 'bottom-left', 'bottom-right'] // Only corners for circles
               : shape.type === 'text'
               ? ['middle-left', 'middle-right'] // Only horizontal resize for text
+              : shape.type === 'line'
+              ? ['top-left', 'bottom-right'] // Only endpoints for lines (stretch on both axes)
               : ['top-left', 'top-center', 'top-right', 'middle-left', 'middle-right', 'bottom-left', 'bottom-center', 'bottom-right']
           }
           keepRatio={shape.type === 'circle'} // Keep circular shape for circles
-          rotateEnabled={shape.type !== 'text'} // Disable rotation for text
+          rotateEnabled={shape.type !== 'text' && shape.type !== 'line'} // Disable rotation for text and lines
           rotationSnaps={[0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240, 255, 270, 285, 300, 315, 330, 345]} // 15° snapping when Shift is held
           anchorSize={8} // Larger anchors for easier grabbing
           anchorStroke="#667eea" // Match selection color
