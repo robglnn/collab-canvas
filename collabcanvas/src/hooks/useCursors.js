@@ -57,7 +57,6 @@ export function useCursors(onlineUserIds = []) {
                 userId,
                 ...cursorData,
               });
-              console.log(`[RTDB] Cursor update for ${cursorData.userName}: (${Math.round(cursorData.x)}, ${Math.round(cursorData.y)})`);
             }
           }
         });
@@ -65,7 +64,6 @@ export function useCursors(onlineUserIds = []) {
       
       // Single state update - no delay!
       setCursors(remoteCursors);
-      console.log('[RTDB] Filtered cursors set:', remoteCursors.length);
     };
     
     // Subscribe to RTDB value changes
