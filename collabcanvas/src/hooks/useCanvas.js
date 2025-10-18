@@ -77,9 +77,16 @@ export function useCanvas() {
     shapesRef.current = shapes;
   }, [shapes]);
 
+  // Track selected shapes ref
+  const selectedShapeIdsRef = useRef(selectedShapeIds);
+  useEffect(() => {
+    selectedShapeIdsRef.current = selectedShapeIds;
+  }, [selectedShapeIds]);
+
   /**
    * Cleanup locks from offline users
    * Periodically checks locked shapes and releases locks if user is offline
+   * CONSERVATIVE: Only unlocks if user has been offline for a while
    */
   useEffect(() => {
     if (!user) return;
@@ -90,6 +97,7 @@ export function useCanvas() {
     const cleanupLocks = async () => {
       try {
         const currentShapes = shapesRef.current;
+        const currentSelectedIds = selectedShapeIdsRef.current;
         if (currentShapes.length === 0) return;
 
         // Get all presence documents to check who's online
@@ -97,46 +105,69 @@ export function useCanvas() {
         const presenceSnapshot = await getDocs(presenceRef);
         
         const onlineUserIds = new Set();
+        const offlineUserLastSeen = new Map();
+        
         presenceSnapshot.forEach((doc) => {
           const data = doc.data();
           if (data.online) {
             onlineUserIds.add(doc.id);
+          } else if (data.lastSeen) {
+            offlineUserLastSeen.set(doc.id, data.lastSeen);
           }
         });
 
+        const now = Date.now();
+        const OFFLINE_GRACE_PERIOD = 30000; // 30 seconds grace period
+
         // Check each locked shape
         for (const shape of currentShapes) {
-          if (shape.lockedBy && !onlineUserIds.has(shape.lockedBy)) {
-            // Skip if we recently unlocked this shape
-            const unlockKey = `${shape.id}-${shape.lockedBy}`;
-            if (recentlyUnlocked.has(unlockKey)) {
-              continue;
-            }
-
-            console.log(`Unlocking shape ${shape.id} - user ${shape.lockedBy} is offline`);
-            await unlockShapeInFirestore(shape.id);
-            
-            // Mark as recently unlocked for 10 seconds
-            recentlyUnlocked.add(unlockKey);
-            setTimeout(() => recentlyUnlocked.delete(unlockKey), 10000);
+          if (!shape.lockedBy) continue;
+          
+          // NEVER unlock currently selected shapes (prevents flickering)
+          if (currentSelectedIds.includes(shape.id)) {
+            continue;
           }
+          
+          // Check if user is online
+          if (onlineUserIds.has(shape.lockedBy)) {
+            continue; // User is online, don't unlock
+          }
+          
+          // Check if user has been offline long enough (grace period)
+          const lastSeen = offlineUserLastSeen.get(shape.lockedBy);
+          if (lastSeen && (now - lastSeen) < OFFLINE_GRACE_PERIOD) {
+            continue; // User went offline recently, give them grace period
+          }
+          
+          // Skip if we recently unlocked this shape
+          const unlockKey = `${shape.id}-${shape.lockedBy}`;
+          if (recentlyUnlocked.has(unlockKey)) {
+            continue;
+          }
+
+          console.log(`Unlocking shape ${shape.id} - user ${shape.lockedBy} offline for >30s`);
+          await unlockShapeInFirestore(shape.id);
+          
+          // Mark as recently unlocked for 60 seconds
+          recentlyUnlocked.add(unlockKey);
+          setTimeout(() => recentlyUnlocked.delete(unlockKey), 60000);
         }
       } catch (error) {
         console.error('Error cleaning up locks:', error);
       }
     };
 
-    // Run cleanup every 5 seconds
-    const interval = setInterval(cleanupLocks, 5000);
+    // Run cleanup every 30 seconds (less aggressive)
+    const interval = setInterval(cleanupLocks, 30000);
     
-    // Also run after a short delay (not immediately to let presence load)
-    const initialTimer = setTimeout(cleanupLocks, 2000);
+    // Also run after initial delay to let presence stabilize
+    const initialTimer = setTimeout(cleanupLocks, 10000);
 
     return () => {
       clearInterval(interval);
       clearTimeout(initialTimer);
     };
-  }, [user]); // Only depend on user, not shapes
+  }, [user]); // Only depend on user, not shapes or selectedShapeIds
 
   /**
    * Add a new shape with optimistic update
