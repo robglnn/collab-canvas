@@ -415,96 +415,105 @@ export default function Canvas() {
   }, [shapes, takeSnapshot]);
 
   /**
+   * Complete selection box - shared logic for both global and Stage mouse up
+   */
+  const completeSelection = useCallback(() => {
+    if (!isSelecting) return;
+
+    setIsSelecting(false);
+
+    if (!selectionBox) {
+      return;
+    }
+
+    // Calculate selection box bounds
+    const box = {
+      x: Math.min(selectionBox.startX, selectionBox.endX),
+      y: Math.min(selectionBox.startY, selectionBox.endY),
+      width: Math.abs(selectionBox.endX - selectionBox.startX),
+      height: Math.abs(selectionBox.endY - selectionBox.startY)
+    };
+
+    // Find shapes that intersect with selection box
+    const selectedIds = shapes.filter(shape => {
+      if (shape.type === 'circle') {
+        // For circles, check if circle's bounding box intersects with selection box
+        const left = shape.x - shape.radius;
+        const right = shape.x + shape.radius;
+        const top = shape.y - shape.radius;
+        const bottom = shape.y + shape.radius;
+        
+        return (
+          left < box.x + box.width &&
+          right > box.x &&
+          top < box.y + box.height &&
+          bottom > box.y
+        );
+      } else if (shape.type === 'text') {
+        // For text, estimate height from fontSize (text doesn't have explicit height)
+        const estimatedHeight = (shape.fontSize || 24) * 1.2; // Line height multiplier
+        return (
+          shape.x < box.x + box.width &&
+          shape.x + (shape.width || 200) > box.x &&
+          shape.y < box.y + box.height &&
+          shape.y + estimatedHeight > box.y
+        );
+      } else if (shape.type === 'line') {
+        // For lines, check if any point is within selection box
+        if (!shape.points || shape.points.length < 4) return false;
+        
+        // Get line bounding box
+        const xCoords = shape.points.filter((_, i) => i % 2 === 0);
+        const yCoords = shape.points.filter((_, i) => i % 2 === 1);
+        const lineLeft = Math.min(...xCoords);
+        const lineRight = Math.max(...xCoords);
+        const lineTop = Math.min(...yCoords);
+        const lineBottom = Math.max(...yCoords);
+        
+        return (
+          lineLeft < box.x + box.width &&
+          lineRight > box.x &&
+          lineTop < box.y + box.height &&
+          lineBottom > box.y
+        );
+      } else {
+        // For rectangles and other shapes with width/height
+        return (
+          shape.x < box.x + box.width &&
+          shape.x + (shape.width || 0) > box.x &&
+          shape.y < box.y + box.height &&
+          shape.y + (shape.height || 0) > box.y
+        );
+      }
+    }).map(shape => shape.id);
+
+    if (selectedIds.length > 0) {
+      selectShape(selectedIds);
+      
+      // Set flag to prevent the subsequent click event from deselecting
+      // Only set if we actually selected something
+      justCompletedSelectionRef.current = true;
+      setTimeout(() => {
+        justCompletedSelectionRef.current = false;
+      }, 50); // Reset after 50ms (enough time for click event to fire)
+    }
+
+    setSelectionBox(null);
+  }, [isSelecting, selectionBox, shapes, selectShape]);
+
+  /**
    * Global mouse up handler to complete selection box even if mouse released outside Stage
    */
   useEffect(() => {
     if (!isSelecting) return;
 
     const handleGlobalMouseUp = () => {
-      setIsSelecting(false);
-
-      if (!selectionBox) {
-        return;
-      }
-
-      // Calculate selection box bounds
-      const box = {
-        x: Math.min(selectionBox.startX, selectionBox.endX),
-        y: Math.min(selectionBox.startY, selectionBox.endY),
-        width: Math.abs(selectionBox.endX - selectionBox.startX),
-        height: Math.abs(selectionBox.endY - selectionBox.startY)
-      };
-
-      // Find shapes that intersect with selection box
-      const selectedIds = shapes.filter(shape => {
-        if (shape.type === 'circle') {
-          // For circles, check if circle's bounding box intersects with selection box
-          const left = shape.x - shape.radius;
-          const right = shape.x + shape.radius;
-          const top = shape.y - shape.radius;
-          const bottom = shape.y + shape.radius;
-          
-          return (
-            left < box.x + box.width &&
-            right > box.x &&
-            top < box.y + box.height &&
-            bottom > box.y
-          );
-        } else if (shape.type === 'text') {
-          // For text, estimate height from fontSize (text doesn't have explicit height)
-          const estimatedHeight = (shape.fontSize || 24) * 1.2; // Line height multiplier
-          return (
-            shape.x < box.x + box.width &&
-            shape.x + (shape.width || 200) > box.x &&
-            shape.y < box.y + box.height &&
-            shape.y + estimatedHeight > box.y
-          );
-        } else if (shape.type === 'line') {
-          // For lines, check if any point is within selection box
-          if (!shape.points || shape.points.length < 4) return false;
-          
-          // Get line bounding box
-          const xCoords = shape.points.filter((_, i) => i % 2 === 0);
-          const yCoords = shape.points.filter((_, i) => i % 2 === 1);
-          const lineLeft = Math.min(...xCoords);
-          const lineRight = Math.max(...xCoords);
-          const lineTop = Math.min(...yCoords);
-          const lineBottom = Math.max(...yCoords);
-          
-          return (
-            lineLeft < box.x + box.width &&
-            lineRight > box.x &&
-            lineTop < box.y + box.height &&
-            lineBottom > box.y
-          );
-        } else {
-          // For rectangles and other shapes with width/height
-          return (
-            shape.x < box.x + box.width &&
-            shape.x + (shape.width || 0) > box.x &&
-            shape.y < box.y + box.height &&
-            shape.y + (shape.height || 0) > box.y
-          );
-        }
-      }).map(shape => shape.id);
-
-      if (selectedIds.length > 0) {
-        selectShape(selectedIds);
-        
-        // Set flag to prevent the subsequent click event from deselecting
-        // Only set if we actually selected something
-        justCompletedSelectionRef.current = true;
-        setTimeout(() => {
-          justCompletedSelectionRef.current = false;
-        }, 50); // Reset after 50ms (enough time for click event to fire)
-      }
-
-      setSelectionBox(null);
+      completeSelection();
     };
 
     window.addEventListener('mouseup', handleGlobalMouseUp);
     return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
-  }, [isSelecting, selectionBox, shapes, selectShape]);
+  }, [isSelecting, completeSelection]);
 
   /**
    * Clamp viewport position to stay within canvas boundaries
@@ -671,86 +680,8 @@ export default function Canvas() {
    * Handle mouse up - complete selection box (called from Stage onMouseUp)
    */
   const handleMouseUp = useCallback(() => {
-    if (!isSelecting) return;
-
-    setIsSelecting(false);
-
-    if (!selectionBox) return;
-
-    // Calculate selection box bounds
-    const box = {
-      x: Math.min(selectionBox.startX, selectionBox.endX),
-      y: Math.min(selectionBox.startY, selectionBox.endY),
-      width: Math.abs(selectionBox.endX - selectionBox.startX),
-      height: Math.abs(selectionBox.endY - selectionBox.startY)
-    };
-
-    // Find shapes that intersect with selection box
-    const selectedIds = shapes.filter(shape => {
-      if (shape.type === 'circle') {
-        // For circles, check if circle's bounding box intersects with selection box
-        const left = shape.x - shape.radius;
-        const right = shape.x + shape.radius;
-        const top = shape.y - shape.radius;
-        const bottom = shape.y + shape.radius;
-        
-        return (
-          left < box.x + box.width &&
-          right > box.x &&
-          top < box.y + box.height &&
-          bottom > box.y
-        );
-      } else if (shape.type === 'text') {
-        // For text, estimate height from fontSize (text doesn't have explicit height)
-        const estimatedHeight = (shape.fontSize || 24) * 1.2; // Line height multiplier
-        return (
-          shape.x < box.x + box.width &&
-          shape.x + (shape.width || 200) > box.x &&
-          shape.y < box.y + box.height &&
-          shape.y + estimatedHeight > box.y
-        );
-      } else if (shape.type === 'line') {
-        // For lines, check if any point is within selection box
-        if (!shape.points || shape.points.length < 4) return false;
-        
-        // Get line bounding box
-        const xCoords = shape.points.filter((_, i) => i % 2 === 0);
-        const yCoords = shape.points.filter((_, i) => i % 2 === 1);
-        const lineLeft = Math.min(...xCoords);
-        const lineRight = Math.max(...xCoords);
-        const lineTop = Math.min(...yCoords);
-        const lineBottom = Math.max(...yCoords);
-        
-        return (
-          lineLeft < box.x + box.width &&
-          lineRight > box.x &&
-          lineTop < box.y + box.height &&
-          lineBottom > box.y
-        );
-      } else {
-        // For rectangles and other shapes with width/height
-        return (
-          shape.x < box.x + box.width &&
-          shape.x + (shape.width || 0) > box.x &&
-          shape.y < box.y + box.height &&
-          shape.y + (shape.height || 0) > box.y
-        );
-      }
-    }).map(shape => shape.id);
-
-    if (selectedIds.length > 0) {
-      selectShape(selectedIds);
-      
-      // Set flag to prevent the subsequent click event from deselecting
-      // Only set if we actually selected something
-      justCompletedSelectionRef.current = true;
-      setTimeout(() => {
-        justCompletedSelectionRef.current = false;
-      }, 50); // Reset after 50ms (enough time for click event to fire)
-    }
-
-    setSelectionBox(null);
-  }, [isSelecting, selectionBox, shapes, selectShape]);
+    completeSelection();
+  }, [completeSelection]);
 
   /**
    * Handle drag start - allow middle mouse button pan
