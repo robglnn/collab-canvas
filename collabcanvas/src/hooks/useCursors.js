@@ -33,6 +33,10 @@ export function useCursors(onlineUserIds = []) {
   // Throttle state
   const lastUpdateRef = useRef(0);
   const pendingUpdateRef = useRef(null);
+  
+  // Track previous cursor count and IDs for logging and comparison (avoid accessing state inside effect)
+  const prevCursorCountRef = useRef(0);
+  const prevCursorIdsRef = useRef('');
 
   // Subscribe to cursors in RTDB
   useEffect(() => {
@@ -134,6 +138,7 @@ export function useCursors(onlineUserIds = []) {
     if (onlineUserIds.length === 0) {
       // No presence data yet, show all cursors temporarily
       setCursors(allCursors);
+      prevCursorIdsRef.current = '';
       return;
     }
 
@@ -142,15 +147,22 @@ export function useCursors(onlineUserIds = []) {
       onlineUserIdSet.has(cursor.userId)
     );
     
-    setCursors(filteredCursors);
-    // Only log when cursor count actually changes
-    const prevCount = cursors.length;
-    const newCount = filteredCursors.length;
-    if (newCount !== prevCount) {
-      console.log(`Filtered cursors: ${newCount} online out of ${allCursors.length} total`);
+    // Only update state if the filtered cursor list actually changed
+    // Compare by serializing to avoid unnecessary re-renders
+    const currentIds = filteredCursors.map(c => c.userId).sort().join(',');
+    
+    if (currentIds !== prevCursorIdsRef.current) {
+      // Only log when cursor count actually changes
+      const newCount = filteredCursors.length;
+      if (newCount !== prevCursorCountRef.current) {
+        console.log(`Filtered cursors: ${newCount} online out of ${allCursors.length} total`);
+        prevCursorCountRef.current = newCount;
+      }
+      
+      prevCursorIdsRef.current = currentIds;
+      setCursors(filteredCursors);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allCursors, onlineUserIds]); // Removed cursors.length from dependencies to prevent loop
+  }, [allCursors, onlineUserIds]);
 
   // Clean up stale cursors on mount (remove cursors from offline users)
   useEffect(() => {

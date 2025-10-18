@@ -63,8 +63,8 @@ export default function Canvas() {
   // Clipboard state for copy/paste
   const [clipboard, setClipboard] = useState([]);
   
-  // Cursor position on canvas (for debug display)
-  const [cursorCanvasPos, setCursorCanvasPos] = useState({ x: 0, y: 0 });
+  // Cursor position on canvas (for debug display) - using ref to avoid re-renders
+  const cursorCanvasPosRef = useRef({ x: 0, y: 0 });
 
   // Auth hook
   const { user } = useAuth();
@@ -589,7 +589,7 @@ export default function Canvas() {
   /**
    * Handle mouse down - start selection box or middle-click pan
    */
-  const handleMouseDown = (e) => {
+  const handleMouseDown = useCallback((e) => {
     // Middle mouse button (button 1) = allow Stage to pan
     if (e.evt.button === 1) {
       // Enable dragging for middle mouse button
@@ -621,12 +621,12 @@ export default function Canvas() {
       });
       setIsSelecting(true);
     }
-  };
+  }, [placeMode]);
 
   /**
    * Handle mouse move - update selection box
    */
-  const handleMouseMoveForSelection = (e) => {
+  const handleMouseMoveForSelection = useCallback((e) => {
     if (!isSelecting) return;
 
     const stage = stageRef.current;
@@ -638,12 +638,12 @@ export default function Canvas() {
       endX: canvasPos.x,
       endY: canvasPos.y
     }));
-  };
+  }, [isSelecting]);
 
   /**
    * Handle mouse up - complete selection box (called from Stage onMouseUp)
    */
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     if (!isSelecting) return;
 
     setIsSelecting(false);
@@ -696,12 +696,12 @@ export default function Canvas() {
     }
 
     setSelectionBox(null);
-  };
+  }, [isSelecting, selectionBox, shapes, selectShape]);
 
   /**
    * Handle drag start - allow middle mouse button pan
    */
-  const handleDragStart = (e) => {
+  const handleDragStart = useCallback((e) => {
     // Only allow stage dragging, not shape dragging
     if (e.target === stageRef.current) {
       // Check if middle mouse button was used (Konva doesn't expose button directly in drag)
@@ -710,12 +710,12 @@ export default function Canvas() {
       setIsDragging(true);
       }
     }
-  };
+  }, [isSelecting]);
 
   /**
    * Handle drag end - clamp position to boundaries
    */
-  const handleDragEnd = (e) => {
+  const handleDragEnd = useCallback((e) => {
     setIsDragging(false);
     
     // Only handle stage drag end
@@ -729,12 +729,12 @@ export default function Canvas() {
       const clampedPos = clampPosition(newPos, stageScale);
       setStagePos(clampedPos);
     }
-  };
+  }, [stageScale, clampPosition]);
 
   /**
    * Handle mouse move - update cursor position, selection box, and debug display
    */
-  const handleMouseMove = (e) => {
+  const handleMouseMove = useCallback((e) => {
     const stage = stageRef.current;
     if (!stage) return;
 
@@ -756,17 +756,17 @@ export default function Canvas() {
     const canvasX = (pointerPos.x - currentPos.x) / currentScale;
     const canvasY = (pointerPos.y - currentPos.y) / currentScale;
 
-    // Update cursor position for debug display
-    setCursorCanvasPos({ x: Math.round(canvasX), y: Math.round(canvasY) });
+    // Update cursor position for debug display (using ref to avoid re-renders)
+    cursorCanvasPosRef.current = { x: Math.round(canvasX), y: Math.round(canvasY) };
 
     // Update cursor position (throttled in useCursors hook)
     updateCursorPosition(canvasX, canvasY);
-  };
+  }, [isSelecting, handleMouseMoveForSelection, updateCursorPosition]);
 
   /**
    * Handle stage click - for placing shapes or deselecting
    */
-  const handleStageClick = (e) => {
+  const handleStageClick = useCallback((e) => {
     // Close context menu if open
     if (contextMenu) {
       setContextMenu(null);
@@ -902,7 +902,7 @@ export default function Canvas() {
         deselectShape();
       }
     }
-  };
+  }, [contextMenu, placeMode, lineStartPoint, placeModeOptions, shapes, addShape, takeSnapshot, selectedShapeIds, user, unlockShape, deselectShape]);
 
   /**
    * Handle toolbar create shape request
@@ -1194,7 +1194,7 @@ export default function Canvas() {
           }, {
             Math.round((window.innerHeight / 2 - stagePos.y) / stageScale)
           })</div>
-          <div>Cursor: ({cursorCanvasPos.x}, {cursorCanvasPos.y})</div>
+          <div>Cursor: ({cursorCanvasPosRef.current.x}, {cursorCanvasPosRef.current.y})</div>
           <div>Stage Offset: ({Math.round(stagePos.x)}, {Math.round(stagePos.y)})</div>
           <div>Canvas: {CANVAS_WIDTH}x{CANVAS_HEIGHT}px</div>
           <div>Shapes: {shapes.length} | Cursors: {cursors.length}</div>
