@@ -2,23 +2,23 @@
   "rules": {
     "cursors": {
       "$canvasId": {
+        ".read": true,
         "$userId": {
-          ".read": "auth != null",
           ".write": "auth != null && auth.uid == $userId"
         }
       }
     },
     "presence": {
       "$canvasId": {
+        ".read": true,
         "$userId": {
-          ".read": "auth != null",
           ".write": "auth != null && auth.uid == $userId"
         }
       }
     },
     "tempUpdates": {
       "$canvasId": {
-        ".read": "auth != null",
+        ".read": true,
         ".write": "auth != null"
       }
     }
