@@ -30,10 +30,17 @@ const CANVAS_ID = 'main'; // Single shared canvas for MVP
 export async function addShape(shape, userId) {
   try {
     const shapeRef = doc(db, 'canvases', CANVAS_ID, 'objects', shape.id);
+    
+    // Get current max zIndex to assign new shape to front
+    const objectsRef = collection(db, 'canvases', CANVAS_ID, 'objects');
+    const snapshot = await getDocs(objectsRef);
+    const maxZIndex = Math.max(0, ...snapshot.docs.map(doc => doc.data().zIndex ?? 0));
+    
     await setDoc(shapeRef, {
       ...shape,
       createdBy: userId,
       lockedBy: null,
+      zIndex: shape.zIndex ?? maxZIndex + 1, // Assign next highest zIndex
       updatedAt: serverTimestamp(),
     });
     console.log('Shape added to Firestore:', shape.id);

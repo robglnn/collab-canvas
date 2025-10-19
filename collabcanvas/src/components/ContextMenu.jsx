@@ -18,6 +18,8 @@ import './ContextMenu.css';
  * @param {Function} onPaste - Callback for paste action
  * @param {Function} onDuplicate - Callback for duplicate action
  * @param {boolean} hasClipboardData - Whether clipboard has data to paste
+ * @param {Function} onBringToFront - Callback for bring to front action
+ * @param {Function} onSendToBack - Callback for send to back action
  * @param {Function} onClose - Callback to close menu
  */
 export default function ContextMenu({ 
@@ -32,6 +34,8 @@ export default function ContextMenu({
   onPaste,
   onDuplicate,
   hasClipboardData,
+  onBringToFront,
+  onSendToBack,
   onClose 
 }) {
   const menuRef = useRef(null);
@@ -124,6 +128,24 @@ export default function ContextMenu({
           setShowCommentsSubmenu(true);
         }}>
           <span>Comments</span>
+        </div>
+
+        <div className="context-menu-divider"></div>
+
+        {/* Bring to Front option */}
+        <div className="context-menu-item" onClick={() => {
+          onBringToFront([shape.id]);
+          onClose();
+        }}>
+          <span>Bring to Front</span>
+        </div>
+
+        {/* Send to Back option */}
+        <div className="context-menu-item" onClick={() => {
+          onSendToBack([shape.id]);
+          onClose();
+        }}>
+          <span>Send to Back</span>
         </div>
 
         {/* Override option - only for owner when shape is locked */}

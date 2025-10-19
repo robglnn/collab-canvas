@@ -13,8 +13,9 @@ import Shape from './Shape';
 import UserCursor from './UserCursor';
 import ContextMenu from './ContextMenu';
 import DisconnectBanner from './DisconnectBanner';
-import AICommandBar from './AICommandBar';
 import { AIBannerManager } from './AIBanner';
+import LayersPanel from './LayersPanel';
+import AIPanel from './AIPanel';
 import './Canvas.css';
 
 /**
@@ -73,6 +74,34 @@ export default function Canvas() {
   // Color selection state
   const [selectedColor, setSelectedColor] = useState('#000000');
 
+  // Layers panel state
+  const [isLayersPanelOpen, setIsLayersPanelOpen] = useState(false);
+  
+  // AI panel state
+  const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
+
+  // Update CSS variable for toolbar width (for layers panel positioning)
+  useEffect(() => {
+    const updateToolbarWidth = () => {
+      const toolbar = document.querySelector('.toolbar');
+      if (toolbar) {
+        const width = toolbar.offsetWidth;
+        document.documentElement.style.setProperty('--toolbar-width', `${width}px`);
+      }
+    };
+
+    updateToolbarWidth();
+    
+    // Use ResizeObserver to track toolbar width changes
+    const toolbar = document.querySelector('.toolbar');
+    if (toolbar) {
+      const resizeObserver = new ResizeObserver(updateToolbarWidth);
+      resizeObserver.observe(toolbar);
+      
+      return () => resizeObserver.disconnect();
+    }
+  }, []); // Run once on mount, ResizeObserver handles dynamic updates
+
   // Auth hook
   const { user } = useAuth();
 
@@ -94,6 +123,9 @@ export default function Canvas() {
     unlockShape,
     forceOverrideLock,
     canEditShape,
+    updateShapesZIndex,
+    bringToFront,
+    sendToBack,
   } = useCanvas();
 
   // Presence hook - to get user names for lock labels
@@ -1347,6 +1379,10 @@ export default function Canvas() {
           selectedShapes={[]}
           onUpdateLineWidth={handleUpdateLineWidth}
           onLineWidthInput={handleLineWidthInput}
+          isLayersPanelOpen={isLayersPanelOpen}
+          onToggleLayersPanel={() => setIsLayersPanelOpen(!isLayersPanelOpen)}
+          isAIPanelOpen={isAIPanelOpen}
+          onToggleAIPanel={() => setIsAIPanelOpen(!isAIPanelOpen)}
         />
         <div className="canvas-loading">
           <div className="loading-spinner"></div>
@@ -1356,16 +1392,23 @@ export default function Canvas() {
     );
   }
 
-  // Apply optimistic updates to shapes (simple and reliable)
-  const shapesWithOptimisticUpdates = shapes.map(shape => {
-    const localUpdate = optimisticUpdates[shape.id] || {};
-    
-    // Merge base shape with optimistic updates
-    return { 
-      ...shape, 
-      ...localUpdate
-    };
-  });
+  // Apply optimistic updates to shapes and sort by zIndex (simple and reliable)
+  const shapesWithOptimisticUpdates = shapes
+    .map(shape => {
+      const localUpdate = optimisticUpdates[shape.id] || {};
+      
+      // Merge base shape with optimistic updates
+      return { 
+        ...shape, 
+        ...localUpdate
+      };
+    })
+    .sort((a, b) => {
+      // Sort by zIndex (lower zIndex = rendered first = back)
+      const aZIndex = a.zIndex ?? 0;
+      const bZIndex = b.zIndex ?? 0;
+      return aZIndex - bZIndex;
+    });
 
   // Get selected shapes for Toolbar (with optimistic updates applied)
   const selectedShapes = shapesWithOptimisticUpdates.filter(s => selectedShapeIds.includes(s.id));
@@ -1393,15 +1436,39 @@ export default function Canvas() {
         }}
         isDebugExpanded={isDebugExpanded}
         onToggleDebug={() => setIsDebugExpanded(!isDebugExpanded)}
-      >
-        <AICommandBar 
-          onSubmit={handleAISubmit} 
-          isProcessing={isProcessing}
-          showSuccess={lastResult?.success && !isProcessing}
-          cooldownRemaining={cooldownRemaining}
-          isOnCooldown={isOnCooldown}
-        />
-      </Toolbar>
+        isLayersPanelOpen={isLayersPanelOpen}
+        onToggleLayersPanel={() => setIsLayersPanelOpen(!isLayersPanelOpen)}
+        isAIPanelOpen={isAIPanelOpen}
+        onToggleAIPanel={() => setIsAIPanelOpen(!isAIPanelOpen)}
+      />
+      
+      {/* Layers Panel */}
+      <LayersPanel
+        shapes={shapes}
+        selectedShapeIds={selectedShapeIds}
+        onSelectShape={(shapeId, addToSelection) => {
+          if (addToSelection) {
+            selectShape(shapeId, true);
+          } else {
+            selectShape(shapeId, false);
+          }
+        }}
+        onReorderShapes={updateShapesZIndex}
+        isOpen={isLayersPanelOpen}
+        onToggle={() => setIsLayersPanelOpen(!isLayersPanelOpen)}
+      />
+      
+      {/* AI Panel */}
+      <AIPanel
+        onSubmit={handleAISubmit}
+        isProcessing={isProcessing}
+        showSuccess={lastResult?.success && !isProcessing}
+        cooldownRemaining={cooldownRemaining}
+        isOnCooldown={isOnCooldown}
+        isOpen={isAIPanelOpen}
+        onToggle={() => setIsAIPanelOpen(!isAIPanelOpen)}
+      />
+      
       <AIBannerManager banners={aiBanners} onBannerClose={handleBannerClose} />
       <DisconnectBanner show={showDisconnectBanner} />
       
@@ -1525,6 +1592,8 @@ export default function Canvas() {
             onPaste={() => handlePaste(contextMenu.x, contextMenu.y)}
             onDuplicate={handleDuplicate}
             hasClipboardData={clipboard.length > 0}
+            onBringToFront={bringToFront}
+            onSendToBack={sendToBack}
             onClose={() => setContextMenu(null)}
           />
         )}

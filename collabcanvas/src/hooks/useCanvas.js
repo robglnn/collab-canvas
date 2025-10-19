@@ -271,6 +271,91 @@ export function useCanvas() {
   }, []);
 
   /**
+   * Update zIndex for multiple shapes (for layer reordering)
+   * 
+   * @param {Array} zIndexUpdates - Array of { id, zIndex } objects
+   */
+  const updateShapesZIndex = useCallback(async (zIndexUpdates) => {
+    if (!user) {
+      console.error('User not authenticated');
+      return;
+    }
+
+    try {
+      // Update each shape's zIndex in Firestore
+      await Promise.all(
+        zIndexUpdates.map(({ id, zIndex }) => 
+          updateShapeInFirestore(id, { zIndex })
+        )
+      );
+      console.log('Updated zIndex for shapes:', zIndexUpdates);
+    } catch (error) {
+      console.error('Failed to update zIndex:', error);
+      alert('Failed to reorder layers. Please try again.');
+    }
+  }, [user]);
+
+  /**
+   * Bring shape(s) to front (set highest zIndex)
+   * 
+   * @param {string|string[]} shapeIds - Shape ID(s) to bring to front
+   */
+  const bringToFront = useCallback(async (shapeIds) => {
+    if (!user) {
+      console.error('User not authenticated');
+      return;
+    }
+
+    const idsArray = Array.isArray(shapeIds) ? shapeIds : [shapeIds];
+    
+    // Find the current highest zIndex
+    const maxZIndex = Math.max(...shapes.map(s => s.zIndex ?? 0), 0);
+    
+    try {
+      // Assign new zIndex values starting from maxZIndex + 1
+      await Promise.all(
+        idsArray.map((id, index) => 
+          updateShapeInFirestore(id, { zIndex: maxZIndex + 1 + index })
+        )
+      );
+      console.log('Brought shapes to front:', idsArray);
+    } catch (error) {
+      console.error('Failed to bring to front:', error);
+      alert('Failed to bring to front. Please try again.');
+    }
+  }, [user, shapes]);
+
+  /**
+   * Send shape(s) to back (set lowest zIndex)
+   * 
+   * @param {string|string[]} shapeIds - Shape ID(s) to send to back
+   */
+  const sendToBack = useCallback(async (shapeIds) => {
+    if (!user) {
+      console.error('User not authenticated');
+      return;
+    }
+
+    const idsArray = Array.isArray(shapeIds) ? shapeIds : [shapeIds];
+    
+    // Find the current lowest zIndex
+    const minZIndex = Math.min(...shapes.map(s => s.zIndex ?? 0), 0);
+    
+    try {
+      // Assign new zIndex values starting from minZIndex - idsArray.length
+      await Promise.all(
+        idsArray.map((id, index) => 
+          updateShapeInFirestore(id, { zIndex: minZIndex - idsArray.length + index })
+        )
+      );
+      console.log('Sent shapes to back:', idsArray);
+    } catch (error) {
+      console.error('Failed to send to back:', error);
+      alert('Failed to send to back. Please try again.');
+    }
+  }, [user, shapes]);
+
+  /**
    * Deselect all shapes or specific shape(s)
    * 
    * @param {string|string[]|null} shapeIds - Shape ID(s) to deselect, or null for all
@@ -378,6 +463,9 @@ export function useCanvas() {
     unlockShape,
     forceOverrideLock,
     canEditShape,
+    updateShapesZIndex,
+    bringToFront,
+    sendToBack,
   };
 }
 

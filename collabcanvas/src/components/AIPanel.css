@@ -1,0 +1,92 @@
+/* AI Panel - Expandable left sidebar */
+.ai-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 250px; /* Match layers panel width */
+  height: auto; /* Don't extend full height */
+  max-height: 400px; /* Limit height to preserve canvas viewing space */
+  background: white;
+  border-right: 1px solid #e0e0e0;
+  border-bottom: 1px solid #e0e0e0;
+  border-bottom-right-radius: 8px; /* Rounded bottom corner */
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 12; /* Higher than layers panel (z-index: 11) */
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.2s ease-out;
+  margin-left: var(--toolbar-width, 128px); /* Position next to flexible toolbar */
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Header */
+.ai-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f8f9fa;
+}
+
+.ai-panel-title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #333;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ai-panel-close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #666;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.ai-panel-close-btn:hover {
+  background: #e0e0e0;
+  color: #333;
+}
+
+/* Content */
+.ai-panel-content {
+  flex: 0 1 auto; /* Don't grow, allow shrink */
+  overflow-y: auto;
+  padding: 1rem;
+  max-height: 320px; /* Limit content height */
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .ai-panel {
+    width: 200px;
+    max-height: 300px; /* Even shorter on mobile */
+    margin-left: var(--toolbar-width, 60px); /* Adjust for flexible toolbar on mobile */
+  }
+
+  .ai-panel-content {
+    padding: 0.5rem;
+    max-height: 220px;
+  }
+}
+

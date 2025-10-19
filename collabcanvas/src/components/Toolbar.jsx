@@ -15,8 +15,12 @@ import './Toolbar.css';
  * @param {Boolean} isDebugExpanded - Whether debug panel is expanded
  * @param {Function} onToggleDebug - Callback to toggle debug panel
  * @param {ReactNode} children - Optional children (e.g., AI Command Bar)
+ * @param {Boolean} isLayersPanelOpen - Whether layers panel is open
+ * @param {Function} onToggleLayersPanel - Callback to toggle layers panel
+ * @param {Boolean} isAIPanelOpen - Whether AI panel is open
+ * @param {Function} onToggleAIPanel - Callback to toggle AI panel
  */
-export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLineWidth, onLineWidthInput, debugData, isDebugExpanded, onToggleDebug, children }) {
+export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLineWidth, onLineWidthInput, debugData, isDebugExpanded, onToggleDebug, children, isLayersPanelOpen, onToggleLayersPanel, isAIPanelOpen, onToggleAIPanel }) {
   const { user } = useAuth();
   const { customColors, saveCustomColor, loading: prefsLoading } = useUserPreferences(user?.uid);
 
@@ -35,7 +39,6 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
   const [hexInput, setHexInput] = useState('#000000');
   const [hexError, setHexError] = useState('');
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
-  const [isAIBarOpen, setIsAIBarOpen] = useState(false);
 
   // Default color palette (10 colors)
   const defaultColors = [
@@ -66,11 +69,17 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
   /**
    * Unified tool selection handler with toggle support
    * If tool is already active, deselects it. Otherwise activates it.
+   * Ensures only one tool is active at a time by closing all panels.
    * 
    * @param {string} toolType - Type of tool to select ('rectangle', 'circle', 'text', 'line')
    * @param {Object} options - Optional configuration for the tool (e.g., text formatting, line width)
    */
   const handleToolSelect = (toolType, options = {}) => {
+    // Close all panels when selecting a shape tool
+    if (isLayersPanelOpen) onToggleLayersPanel();
+    if (isColorPickerOpen) setIsColorPickerOpen(false);
+    if (isAIPanelOpen) onToggleAIPanel();
+    
     if (isPlaceMode && activeShape === toolType) {
       // Tool is already active - deselect/exit place mode
       exitPlaceMode();
@@ -168,82 +177,112 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
       <div className="toolbar-section">
         <h3 className="toolbar-title">Tools</h3>
         
-        {/* AI Assistant Button */}
-        <button
-          className={`toolbar-btn ${isAIBarOpen ? 'active' : ''}`}
-          onClick={() => setIsAIBarOpen(!isAIBarOpen)}
-          title="AI Assistant"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2C10.9 2 10 2.9 10 4C10 4.7 10.4 5.3 11 5.6V7H9C7.3 7 6 8.3 6 10V12C6 13.7 7.3 15 9 15H11V18.4C10.4 18.7 10 19.3 10 20C10 21.1 10.9 22 12 22C13.1 22 14 21.1 14 20C14 19.3 13.6 18.7 13 18.4V15H15C16.7 15 18 13.7 18 12V10C18 8.3 16.7 7 15 7H13V5.6C13.6 5.3 14 4.7 14 4C14 2.9 13.1 2 12 2Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-            <circle cx="9" cy="10" r="1.5" fill="currentColor"/>
-            <circle cx="15" cy="10" r="1.5" fill="currentColor"/>
-            <path d="M9 12.5C9 12.5 10 13.5 12 13.5C14 13.5 15 12.5 15 12.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-        </button>
-        
-        <button
-          className={`toolbar-btn ${isPlaceMode && activeShape === 'rectangle' ? 'active' : ''}`}
-          onClick={handleRectangleClick}
-          title="Click to place rectangle (100x100px)"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <rect x="4" y="6" width="16" height="12" stroke="currentColor" strokeWidth="2" rx="1"/>
-          </svg>
-        </button>
+        <div className="toolbar-buttons-grid">
+          {/* Row 1: Rectangle | Circle */}
+          <button
+            className={`toolbar-btn ${isPlaceMode && activeShape === 'rectangle' ? 'active' : ''}`}
+            onClick={handleRectangleClick}
+            title="Click to place rectangle (100x100px)"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <rect x="4" y="6" width="16" height="12" stroke="currentColor" strokeWidth="2" rx="1"/>
+            </svg>
+          </button>
 
-        <button
-          className={`toolbar-btn ${isPlaceMode && activeShape === 'circle' ? 'active' : ''}`}
-          onClick={handleCircleClick}
-          title="Click to place circle (100px diameter)"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2"/>
-          </svg>
-        </button>
+          <button
+            className={`toolbar-btn ${isPlaceMode && activeShape === 'circle' ? 'active' : ''}`}
+            onClick={handleCircleClick}
+            title="Click to place circle (100px diameter)"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2"/>
+            </svg>
+          </button>
 
-        <button
-          className={`toolbar-btn ${isPlaceMode && activeShape === 'text' ? 'active' : ''}`}
-          onClick={handleTextClick}
-          title="Click to place text (double-click to edit)"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <text x="12" y="16" fontSize="14" textAnchor="middle" fill="currentColor" fontWeight="bold">T</text>
-          </svg>
-        </button>
+          {/* Row 2: Line | Text */}
+          <button
+            className={`toolbar-btn ${isPlaceMode && activeShape === 'line' ? 'active' : ''}`}
+            onClick={handleLineClick}
+            title="Click twice to draw a line"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <line x1="4" y1="18" x2="20" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+          </button>
 
-        <button
-          className={`toolbar-btn ${isPlaceMode && activeShape === 'line' ? 'active' : ''}`}
-          onClick={handleLineClick}
-          title="Click twice to draw a line"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <line x1="4" y1="18" x2="20" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-        </button>
+          <button
+            className={`toolbar-btn ${isPlaceMode && activeShape === 'text' ? 'active' : ''}`}
+            onClick={handleTextClick}
+            title="Click to place text (double-click to edit)"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <text x="12" y="16" fontSize="14" textAnchor="middle" fill="currentColor" fontWeight="bold">T</text>
+            </svg>
+          </button>
 
-        <button
-          className={`toolbar-btn ${isColorPickerOpen ? 'active' : ''}`}
-          onClick={() => setIsColorPickerOpen(!isColorPickerOpen)}
-          title="Color Picker"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2C10.9 2 10 2.9 10 4C10 4.7 10.4 5.4 11 5.7V7C8.2 7.4 6 9.7 6 12.5C6 15.5 8.5 18 11.5 18H12.5C15.5 18 18 15.5 18 12.5C18 9.7 15.8 7.4 13 7V5.7C13.6 5.4 14 4.7 14 4C14 2.9 13.1 2 12 2Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-            <circle cx="9" cy="11" r="1" fill="currentColor"/>
-            <circle cx="15" cy="11" r="1" fill="currentColor"/>
-            <circle cx="12" cy="9" r="1" fill="currentColor"/>
-            <circle cx="9" cy="14" r="1" fill="currentColor"/>
-            <circle cx="15" cy="14" r="1" fill="currentColor"/>
-          </svg>
-        </button>
-      </div>
+          {/* Row 3: Layers | Color */}
+          <button
+            className={`toolbar-btn ${isLayersPanelOpen ? 'active' : ''}`}
+            onClick={() => {
+              // Close other panels and exit place mode when opening layers
+              if (isPlaceMode) exitPlaceMode();
+              if (isColorPickerOpen) setIsColorPickerOpen(false);
+              if (isAIPanelOpen) onToggleAIPanel();
+              onToggleLayersPanel();
+            }}
+            title="Layers Panel"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M3 7L12 3L21 7L12 11L3 7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M3 12L12 16L21 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M3 17L12 21L21 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
 
-      {/* AI Command Bar - Collapsible */}
-      {isAIBarOpen && children && (
-        <div className="toolbar-section">
-          {children}
+          <button
+            className={`toolbar-btn ${isColorPickerOpen ? 'active' : ''}`}
+            onClick={() => {
+              // Close other panels and exit place mode when opening color picker
+              if (isPlaceMode) exitPlaceMode();
+              if (isLayersPanelOpen) onToggleLayersPanel();
+              if (isAIPanelOpen) onToggleAIPanel();
+              setIsColorPickerOpen(!isColorPickerOpen);
+            }}
+            title="Color Picker"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2C10.9 2 10 2.9 10 4C10 4.7 10.4 5.4 11 5.7V7C8.2 7.4 6 9.7 6 12.5C6 15.5 8.5 18 11.5 18H12.5C15.5 18 18 15.5 18 12.5C18 9.7 15.8 7.4 13 7V5.7C13.6 5.4 14 4.7 14 4C14 2.9 13.1 2 12 2Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+              <circle cx="9" cy="11" r="1" fill="currentColor"/>
+              <circle cx="15" cy="11" r="1" fill="currentColor"/>
+              <circle cx="12" cy="9" r="1" fill="currentColor"/>
+              <circle cx="9" cy="14" r="1" fill="currentColor"/>
+              <circle cx="15" cy="14" r="1" fill="currentColor"/>
+            </svg>
+          </button>
+
+          {/* Row 4: (empty) | AI Agent */}
+          <div></div> {/* Empty cell */}
+          
+          <button
+            className={`toolbar-btn ${isAIPanelOpen ? 'active' : ''}`}
+            onClick={() => {
+              // Close other panels and exit place mode when opening AI panel
+              if (isPlaceMode) exitPlaceMode();
+              if (isLayersPanelOpen) onToggleLayersPanel();
+              if (isColorPickerOpen) setIsColorPickerOpen(false);
+              onToggleAIPanel();
+            }}
+            title="AI Assistant"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2C10.9 2 10 2.9 10 4C10 4.7 10.4 5.3 11 5.6V7H9C7.3 7 6 8.3 6 10V12C6 13.7 7.3 15 9 15H11V18.4C10.4 18.7 10 19.3 10 20C10 21.1 10.9 22 12 22C13.1 22 14 21.1 14 20C14 19.3 13.6 18.7 13 18.4V15H15C16.7 15 18 13.7 18 12V10C18 8.3 16.7 7 15 7H13V5.6C13.6 5.3 14 4.7 14 4C14 2.9 13.1 2 12 2Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+              <circle cx="9" cy="10" r="1.5" fill="currentColor"/>
+              <circle cx="15" cy="10" r="1.5" fill="currentColor"/>
+              <path d="M9 12.5C9 12.5 10 13.5 12 13.5C14 13.5 15 12.5 15 12.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </button>
         </div>
-      )}
+      </div>
 
       {/* Color Picker - Collapsible */}
       {isColorPickerOpen && (
@@ -369,7 +408,7 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
       {/* Text Formatting Controls - Show when creating text OR when text is selected */}
       {((isPlaceMode && activeShape === 'text') || hasTextSelected) && (
         <div className="toolbar-section">
-          <h3 className="toolbar-title">Text Formatting</h3>
+          <h3 className="toolbar-title">Text Format</h3>
           
           {/* Font Family Selector */}
           <label className="toolbar-label">
