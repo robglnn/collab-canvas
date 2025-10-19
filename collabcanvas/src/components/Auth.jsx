@@ -76,7 +76,9 @@ export default function Auth({ children, usersButton, onBeforeSignOut, onDownloa
       <div className="auth-container">
         <div className="auth-card">
           <h1>CollabCanvas</h1>
-          <p className="auth-subtitle">Real-time collaborative canvas</p>
+          <p className="auth-subtitle">"The Collaborative Act"</p>
+          
+          <div className="auth-divider"></div>
           
           <button 
             className="google-signin-btn" 
