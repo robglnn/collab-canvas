@@ -365,7 +365,7 @@ export default function Canvas() {
     const timeoutId2 = setTimeout(updateDimensions, 100);
     const timeoutId3 = setTimeout(updateDimensions, 500);
 
-    // Watch for resize
+    // Watch for resize with ResizeObserver
     let resizeObserver;
     if (containerRef.current) {
       resizeObserver = new ResizeObserver(updateDimensions);
@@ -379,6 +379,36 @@ export default function Canvas() {
       if (resizeObserver) {
         resizeObserver.disconnect();
       }
+    };
+  }, []); // Empty deps - effect runs once on mount
+
+  /**
+   * Handle window resize with debouncing
+   * Ensures canvas dimensions update when browser window is resized
+   */
+  useEffect(() => {
+    let resizeTimeout;
+    
+    const handleWindowResize = () => {
+      // Debounce resize updates to avoid performance issues during resize
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        if (containerRef.current) {
+          const width = containerRef.current.offsetWidth;
+          const height = containerRef.current.offsetHeight;
+          console.log('[Canvas] Window resize - updating dimensions:', { width, height });
+          if (width > 0 && height > 0) {
+            setStageDimensions({ width, height });
+          }
+        }
+      }, 100); // 100ms debounce
+    };
+
+    window.addEventListener('resize', handleWindowResize);
+    
+    return () => {
+      clearTimeout(resizeTimeout);
+      window.removeEventListener('resize', handleWindowResize);
     };
   }, []); // Empty deps - effect runs once on mount
 
