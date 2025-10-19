@@ -64,48 +64,45 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
     : (selectedLine ? (selectedLine.strokeWidth || 3) : lineWidth);
 
   /**
-   * Handle rectangle button click
-   * Enters "place mode" where user clicks on canvas to place shape
+   * Unified tool selection handler with toggle support
+   * If tool is already active, deselects it. Otherwise activates it.
+   * 
+   * @param {string} toolType - Type of tool to select ('rectangle', 'circle', 'text', 'line')
+   * @param {Object} options - Optional configuration for the tool (e.g., text formatting, line width)
    */
-  const handleRectangleClick = () => {
-    setIsPlaceMode(true);
-    setActiveShape('rectangle');
-    onCreateShape('rectangle');
-    console.log('Place mode activated: rectangle');
+  const handleToolSelect = (toolType, options = {}) => {
+    if (isPlaceMode && activeShape === toolType) {
+      // Tool is already active - deselect/exit place mode
+      exitPlaceMode();
+      console.log(`Place mode deactivated: ${toolType}`);
+    } else {
+      // Activate the tool
+      setIsPlaceMode(true);
+      setActiveShape(toolType);
+      onCreateShape(toolType, options);
+      console.log(`Place mode activated: ${toolType}`);
+    }
   };
 
   /**
-   * Handle circle button click
-   * Enters "place mode" where user clicks on canvas to place shape
+   * Handle rectangle button click - toggle rectangle tool
    */
-  const handleCircleClick = () => {
-    setIsPlaceMode(true);
-    setActiveShape('circle');
-    onCreateShape('circle');
-    console.log('Place mode activated: circle');
-  };
+  const handleRectangleClick = () => handleToolSelect('rectangle');
 
   /**
-   * Handle text button click
-   * Enters "place mode" where user clicks on canvas to place text
+   * Handle circle button click - toggle circle tool
    */
-  const handleTextClick = () => {
-    setIsPlaceMode(true);
-    setActiveShape('text');
-    onCreateShape('text', { fontFamily, isBold, isUnderline });
-    console.log('Place mode activated: text');
-  };
+  const handleCircleClick = () => handleToolSelect('circle');
 
   /**
-   * Handle line button click
-   * Enters "place mode" where user clicks twice to create a line
+   * Handle text button click - toggle text tool
    */
-  const handleLineClick = () => {
-    setIsPlaceMode(true);
-    setActiveShape('line');
-    onCreateShape('line', { lineWidth });
-    console.log('Place mode activated: line');
-  };
+  const handleTextClick = () => handleToolSelect('text', { fontFamily, isBold, isUnderline });
+
+  /**
+   * Handle line button click - toggle line tool
+   */
+  const handleLineClick = () => handleToolSelect('line', { lineWidth });
 
   /**
    * Exit place mode (called from Canvas component after placing shape)
