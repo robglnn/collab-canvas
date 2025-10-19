@@ -155,6 +155,11 @@ Canvas Rendering (Konva.js)
   
 /canvases/main/presence/{userId}
   - User presence data (online, role, photoURL, lastSeen)
+
+/canvases/main/comments/{commentId}
+  - Shape-specific comments (PR #23)
+  - Comment data (shapeId, text, userId, userName, userInitials, timestamps, deleted)
+  - Soft delete support (deleted flag instead of document deletion)
 ```
 
 ### 2. Data Model
@@ -197,6 +202,21 @@ Canvas Rendering (Konva.js)
   canvasId: 'main', // hardcoded for single canvas
   ownerId: string, // first user to load app becomes permanent owner for MVP
   createdAt: timestamp
+}
+
+// Shape Comment (PR #23)
+{
+  id: string,
+  shapeId: string, // which shape this comment belongs to
+  text: string, // comment text (max 100 chars)
+  userId: string,
+  userName: string,
+  userInitials: string, // first letter of first + last name
+  createdAt: timestamp,
+  updatedAt: timestamp,
+  deleted: boolean, // soft delete flag (can be undone once)
+  deletedAt: timestamp | null,
+  permanentlyDeleted: boolean // true after undo window expires
 }
 ```
 
@@ -350,6 +370,9 @@ Canvas Rendering (Konva.js)
 - ❌ Mobile/touch device support
 - ❌ Owner transfer/reassignment
 
+**📋 Planned Features:**
+- 📝 Shape Comments (PR #23 - Context menu based commenting system)
+
 **🚀 In Progress:**
 - 🔄 AI Canvas Agent (PRs #26-29 - NEXT)
 
@@ -415,4 +438,12 @@ All decisions have been made. Time to start building:
   - Click to see full list with avatars, names, and roles
   - User account menu with Settings and Sign Out options
   - Only displays currently online users
+- [ ] **Shape Comments (PR #23):** Context menu based commenting system
+  - Right-click shape → "Comments" opens submenu
+  - View all comments on specific shape with user initials and timestamps
+  - Add new comments (100 character limit)
+  - Edit and delete existing comments
+  - Delete with undo support: Ctrl+Z rescues once, then permanent deletion
+  - Real-time multi-user commenting
+  - Soft delete with full audit trail
 - [x] **Originally Out of Scope:** ~~Undo/redo~~ ✅ (PR #21), ~~multi-select~~ ✅ (PR #18), shape customization (still pending), mobile support (still pending)

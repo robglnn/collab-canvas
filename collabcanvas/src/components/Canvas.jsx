@@ -379,6 +379,85 @@ export default function Canvas() {
   }, [CANVAS_WIDTH, CANVAS_HEIGHT, SPAWN_CANVAS_X, SPAWN_CANVAS_Y, SPAWN_ZOOM, isInitialized, calculateStagePosition, stageDimensions]);
 
   /**
+   * Handle copy from context menu or keyboard
+   */
+  const handleCopy = useCallback(() => {
+    if (selectedShapeIds.length > 0) {
+      const selectedShapes = shapes.filter(s => selectedShapeIds.includes(s.id));
+      setClipboard(selectedShapes);
+      console.log(`Copied ${selectedShapes.length} shape(s) to clipboard`);
+    }
+  }, [selectedShapeIds, shapes]);
+
+  /**
+   * Handle paste from context menu or keyboard
+   */
+  const handlePaste = useCallback((cursorX, cursorY) => {
+    if (clipboard.length === 0) return;
+
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    takeSnapshot(shapes); // Take snapshot before pasting
+
+    // If cursor position provided (from right-click), use it
+    // Otherwise use viewport center (for keyboard shortcut)
+    let pasteX, pasteY;
+    if (cursorX !== undefined && cursorY !== undefined) {
+      // Convert screen coordinates to canvas coordinates
+      const canvasPos = screenToCanvas({ x: cursorX, y: cursorY }, stage);
+      pasteX = canvasPos.x;
+      pasteY = canvasPos.y;
+    } else {
+      // Use viewport center for keyboard paste
+      pasteX = (stageDimensions.width / 2 - stagePos.x) / stageScale;
+      pasteY = (stageDimensions.height / 2 - stagePos.y) / stageScale;
+    }
+
+    const pastedShapes = clipboard.map((shape, index) => ({
+      ...shape,
+      id: `shape-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      x: pasteX + (index * 20), // Offset each shape slightly
+      y: pasteY + (index * 20),
+      lockedBy: null, // Clear lock
+    }));
+
+    pastedShapes.forEach(shape => addShape(shape));
+
+    // Select the newly pasted shapes
+    const newIds = pastedShapes.map(s => s.id);
+    selectShape(newIds);
+
+    console.log(`Pasted ${pastedShapes.length} shape(s)`);
+  }, [clipboard, shapes, takeSnapshot, addShape, selectShape, stageDimensions, stagePos, stageScale]);
+
+  /**
+   * Handle duplicate from context menu or keyboard
+   */
+  const handleDuplicate = useCallback(() => {
+    if (selectedShapeIds.length === 0) return;
+
+    takeSnapshot(shapes); // Take snapshot before duplicating
+
+    const selectedShapes = shapes.filter(s => selectedShapeIds.includes(s.id));
+    const duplicatedShapes = selectedShapes.map(shape => ({
+      ...shape,
+      id: `shape-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      x: shape.x + 20, // Offset by 20px
+      y: shape.y + 20,
+      lockedBy: null, // Clear lock
+    }));
+
+    duplicatedShapes.forEach(shape => addShape(shape));
+
+    // Select the duplicated shapes
+    const newIds = duplicatedShapes.map(s => s.id);
+    selectShape(newIds);
+
+    console.log(`Duplicated ${duplicatedShapes.length} shape(s)`);
+  }, [selectedShapeIds, shapes, takeSnapshot, addShape, selectShape]);
+
+  /**
    * Handle keyboard events (Delete, Copy, Paste, Duplicate)
    */
   useEffect(() => {
@@ -392,52 +471,19 @@ export default function Canvas() {
       // Copy selected shapes (Ctrl+C or Cmd+C)
       if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedShapeIds.length > 0) {
         e.preventDefault();
-        const selectedShapes = shapes.filter(s => selectedShapeIds.includes(s.id));
-        setClipboard(selectedShapes);
-        console.log(`Copied ${selectedShapes.length} shape(s) to clipboard`);
+        handleCopy();
       }
       
       // Paste shapes (Ctrl+V or Cmd+V)
       if ((e.ctrlKey || e.metaKey) && e.key === 'v' && clipboard.length > 0) {
         e.preventDefault();
-        takeSnapshot(shapes); // Take snapshot before pasting
-        const pastedShapes = clipboard.map(shape => ({
-          ...shape,
-          id: `shape-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          x: shape.x + 20, // Offset by 20px
-          y: shape.y + 20,
-          lockedBy: null, // Clear lock
-        }));
-        
-        pastedShapes.forEach(shape => addShape(shape));
-        
-        // Select the newly pasted shapes
-        const newIds = pastedShapes.map(s => s.id);
-        selectShape(newIds);
-        
-        console.log(`Pasted ${pastedShapes.length} shape(s)`);
+        handlePaste(); // Uses viewport center when called from keyboard
       }
       
       // Duplicate shapes (Ctrl+D or Cmd+D)
       if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedShapeIds.length > 0) {
         e.preventDefault();
-        takeSnapshot(shapes); // Take snapshot before duplicating
-        const selectedShapes = shapes.filter(s => selectedShapeIds.includes(s.id));
-        const duplicatedShapes = selectedShapes.map(shape => ({
-          ...shape,
-          id: `shape-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          x: shape.x + 20, // Offset by 20px
-          y: shape.y + 20,
-          lockedBy: null, // Clear lock
-        }));
-        
-        duplicatedShapes.forEach(shape => addShape(shape));
-        
-        // Select the duplicated shapes
-        const newIds = duplicatedShapes.map(s => s.id);
-        selectShape(newIds);
-        
-        console.log(`Duplicated ${duplicatedShapes.length} shape(s)`);
+        handleDuplicate();
       }
       
       // Undo (Ctrl+Z or Cmd+Z)
@@ -513,7 +559,7 @@ export default function Canvas() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedShapeIds, shapes, clipboard, deleteShape, addShape, selectShape, updateShape, canUndo, canRedo, undo, redo]);
+  }, [selectedShapeIds, shapes, clipboard, deleteShape, addShape, selectShape, updateShape, canUndo, canRedo, undo, redo, handleCopy, handlePaste, handleDuplicate]);
 
   /**
    * Track previous shapes for snapshot comparison
@@ -1257,6 +1303,27 @@ export default function Canvas() {
   };
 
   /**
+   * Handle canvas right-click (for paste menu)
+   */
+  const handleCanvasRightClick = (e) => {
+    e.evt.preventDefault(); // Prevent default browser context menu
+    
+    const stage = stageRef.current;
+    if (!stage) return;
+    
+    const pointerPos = stage.getPointerPosition();
+    
+    // Only show paste menu if clipboard has data
+    if (clipboard.length > 0) {
+      setContextMenu({
+        shape: null, // null indicates canvas context menu
+        x: pointerPos.x,
+        y: pointerPos.y,
+      });
+    }
+  };
+
+  /**
    * Handle override control from context menu
    */
   const handleOverrideControl = (shapeId) => {
@@ -1357,6 +1424,7 @@ export default function Canvas() {
             onMouseUp={handleMouseUp}
             onClick={handleStageClick}
             onTap={handleStageClick}
+            onContextMenu={handleCanvasRightClick}
             className={isDragging ? 'dragging' : ''}
           >
           <Layer>
@@ -1451,7 +1519,12 @@ export default function Canvas() {
             shape={contextMenu.shape}
             isOwner={isOwner}
             currentUserId={user?.uid}
+            user={user}
             onOverride={handleOverrideControl}
+            onCopy={handleCopy}
+            onPaste={() => handlePaste(contextMenu.x, contextMenu.y)}
+            onDuplicate={handleDuplicate}
+            hasClipboardData={clipboard.length > 0}
             onClose={() => setContextMenu(null)}
           />
         )}

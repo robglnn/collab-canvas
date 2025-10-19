@@ -1261,75 +1261,150 @@ collabcanvas/
 
 **Branch:** `feature/comments`
 
-**Goal:** Add shape comments with add/edit/delete functionality
+**Goal:** Add shape-specific comments accessible via right-click context menu
 
 ### Tasks:
 
 - [ ] **23.1: Create Comments Hook**
-  - Subscribe to `/canvases/main/comments` collection
+  - Subscribe to `/canvases/main/comments` collection filtered by shapeId
   - Functions: addComment, updateComment, deleteComment (soft delete)
-  - Return comments array sorted by creation date
+  - Return comments array sorted by creation date (newest first)
   - **Files Created:**
     - `src/hooks/useComments.js`
 
-- [ ] **23.2: Create Comments Panel Component**
-  - Expandable panel in left sidebar (under Layers)
-  - Show + button to add comment
-  - List all comments with user initials, timestamp, text
-  - Click text to edit, click elsewhere to save
-  - X button to delete comment
+- [ ] **23.2: Create Comments Submenu Component**
+  - Submenu that opens from context menu when "Comments" is clicked
+  - Display list of existing comments for the selected shape
+  - Show user initials (first letter of first + last name)
+  - Show timestamp in format: "YY Month Day hh:mm:ss" (e.g., "24 Oct 19 14:32:15")
+  - Show comment text (max 100 characters)
+  - Each comment has edit and delete icons
+  - Text input box at bottom with green checkmark button to submit
   - **Files Created:**
-    - `src/components/CommentsPanel.jsx`
-    - `src/components/CommentsPanel.css`
+    - `src/components/CommentsSubmenu.jsx`
+    - `src/components/CommentsSubmenu.css`
 
-- [ ] **23.3: Implement Add Comment**
-  - Click + button opens add form
-  - Select shape from dropdown
-  - Enter comment text (max 100 chars)
-  - Submit to Firestore
+- [ ] **23.3: Update Context Menu with Comments Option**
+  - Add "Comments" menu item to shape context menu
+  - Position after Duplicate, before any divider
+  - Show comment icon (💬) next to label
+  - On click, open CommentsSubmenu instead of closing menu
+  - Pass shapeId to submenu for filtering
   - **Files Modified:**
-    - `src/components/CommentsPanel.jsx`
+    - `src/components/ContextMenu.jsx`
+    - `src/components/ContextMenu.css`
 
-- [ ] **23.4: Implement Edit Comment**
-  - Click comment text to enter edit mode
-  - Show textarea with current text
-  - Save on blur or click outside
+- [ ] **23.4: Implement Submenu Positioning Logic**
+  - Position submenu to the right of context menu
+  - If not enough space on right, open to left
+  - If not enough space vertically, adjust position
+  - Ensure submenu stays within viewport bounds
   - **Files Modified:**
-    - `src/components/CommentsPanel.jsx`
+    - `src/components/CommentsSubmenu.jsx`
+    - `src/components/CommentsSubmenu.css`
 
-- [ ] **23.5: Implement Delete Comment**
-  - Click X button to delete
-  - Soft delete (set deleted: true)
+- [ ] **23.5: Implement Add Comment**
+  - Text input box in submenu (100 char limit)
+  - Character counter showing remaining chars
+  - Green checkmark button to submit
+  - Submit adds comment to Firestore with:
+    - shapeId, text, userId, userName, userInitials, createdAt, updatedAt
+  - Clear input after successful submission
+  - Show error if submission fails
+  - **Files Modified:**
+    - `src/components/CommentsSubmenu.jsx`
+    - `src/hooks/useComments.js`
+
+- [ ] **23.6: Implement Edit Comment**
+  - Click edit icon (✏️) next to comment to enter edit mode
+  - Replace comment text with textarea (pre-filled with current text)
+  - Show green checkmark to save, red X to cancel
+  - Save updates comment in Firestore (update updatedAt timestamp)
+  - Cancel reverts to display mode without changes
+  - **Files Modified:**
+    - `src/components/CommentsSubmenu.jsx`
+    - `src/hooks/useComments.js`
+
+- [ ] **23.7: Implement Delete Comment with Undo Support**
+  - Click delete icon (🗑️) next to comment
+  - Show confirmation: "Delete this comment?"
+  - On confirm, soft delete (set deleted: true, deletedAt timestamp)
   - Filter out deleted comments in UI
+  - Integrate with undo/redo system: Ctrl+Z can rescue deleted comment once
+  - After second deletion (or after undo is cleared), permanently delete from Firestore
+  - Track deletion in undo history as "Delete Comment" action
   - **Files Modified:**
-    - `src/components/CommentsPanel.jsx`
+    - `src/components/CommentsSubmenu.jsx`
     - `src/hooks/useComments.js`
+    - `src/hooks/useHistory.js` (add comment deletion support)
 
-- [ ] **23.6: Format User Initials and Timestamps**
-  - Extract first letter of first + last name
-  - Format timestamp as relative (e.g., "3m ago", "2h ago")
+- [ ] **23.8: Format Timestamps and Initials**
+  - Extract user initials from userName (first letter of first + last name)
+  - Format createdAt timestamp as "YY Month Day hh:mm:ss"
+  - If comment is edited, show "(edited)" indicator
+  - Use 24-hour time format
   - **Files Modified:**
-    - `src/components/CommentsPanel.jsx`
+    - `src/components/CommentsSubmenu.jsx`
+    - `src/lib/canvasUtils.js` (add helper functions)
 
-- [ ] **23.7: Create Comments Firestore Collection**
+- [ ] **23.9: Create Comments Firestore Collection**
   - Add `/canvases/main/comments/{commentId}` collection
-  - Store shapeId, text, userId, userName, userInitials, timestamps
-  - Update Firestore security rules
+  - Schema:
+    ```javascript
+    {
+      id: string,
+      shapeId: string,
+      text: string (max 100 chars),
+      userId: string,
+      userName: string,
+      userInitials: string,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      deleted: boolean (default false),
+      deletedAt: timestamp | null,
+      permanentlyDeleted: boolean (default false) // true after undo window expires
+    }
+    ```
+  - Add composite index: shapeId + deleted + createdAt
+  - Update Firestore security rules (authenticated users can read/write)
   - **Files Modified:**
     - `firestore.rules`
+    - `firestore.indexes.json`
 
-- [ ] **23.8: Integrate Comments Panel**
-  - Add CommentsPanel to left sidebar
-  - Position below LayersPanel
+- [ ] **23.10: Handle Edge Cases**
+  - Empty state: Show "No comments yet" when no comments exist
+  - Long text: Wrap comment text and show scrollbar if needed
+  - Real-time updates: New comments from other users appear instantly
+  - Validation: Prevent empty comments, enforce 100 char limit
+  - Multi-user editing: Show error if comment is deleted while editing
+  - Undo rescue: Track when comment can be rescued vs permanently deleted
+  - Clean up: Periodically remove permanently deleted comments from database
   - **Files Modified:**
-    - `src/App.jsx`
+    - `src/components/CommentsSubmenu.jsx`
+    - `src/hooks/useComments.js`
 
-- [ ] **23.9: Test Comments System**
-  - Test adding comments to shapes
-  - Test editing comments
-  - Test deleting comments
-  - Test multi-user comments (all users can see/edit)
-  - Test 100 character limit
+- [ ] **23.11: Style Comments Submenu**
+  - Match existing context menu styling
+  - Distinct background for comments list vs input area
+  - Hover effects on edit/delete icons
+  - Smooth transitions for edit mode
+  - Mobile-friendly sizing (even if not fully supported)
+  - **Files Modified:**
+    - `src/components/CommentsSubmenu.css`
+
+- [ ] **23.12: Test Comments System**
+  - Test adding comments to different shape types (rect, circle, text, line)
+  - Test editing own comments and other users' comments
+  - Test deleting comments with confirmation
+  - Test 100 character limit and character counter
+  - Test undo/redo for comment deletion (Ctrl+Z rescues once)
+  - Test permanent deletion after second delete or undo history clear
+  - Test multi-user scenario: both users commenting on same shape
+  - Test real-time updates: comments appear instantly for other users
+  - Test submenu positioning at various screen positions
+  - Test with no comments (empty state)
+  - Test long comments (wrapping and scrolling)
+  - Test rapid add/edit/delete operations
 
 ---
 

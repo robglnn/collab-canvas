@@ -126,3 +126,51 @@ export function getUserColor(userId) {
   return colors[index];
 }
 
+/**
+ * Format Firestore timestamp for comment display
+ * Format: "YY Month Day hh:mm:ss" (24-hour time)
+ * Example: "24 Oct 19 14:32:15"
+ * 
+ * @param {Object} timestamp - Firestore timestamp object
+ * @returns {string} Formatted timestamp string
+ */
+export function formatCommentTimestamp(timestamp) {
+  if (!timestamp) return '';
+  
+  try {
+    // Convert Firestore timestamp to JS Date
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    
+    const year = String(date.getFullYear()).slice(-2);
+    const month = date.toLocaleString('en', { month: 'short' });
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    
+    return `${year} ${month} ${day} ${hours}:${minutes}:${seconds}`;
+  } catch (error) {
+    console.error('Error formatting timestamp:', error);
+    return '';
+  }
+}
+
+/**
+ * Extract user initials from display name
+ * Format: First letter of first name + first letter of last name
+ * Examples: "John Doe" → "JD", "Alice" → "A", "Bob Smith Jones" → "BS"
+ * 
+ * @param {string} userName - User's display name
+ * @returns {string} User initials (e.g., "JD")
+ */
+export function extractUserInitials(userName) {
+  if (!userName) return '?';
+  
+  const words = userName.trim().split(/\s+/);
+  if (words.length === 1) {
+    return words[0][0]?.toUpperCase() || '?';
+  }
+  
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+

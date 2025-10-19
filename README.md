@@ -12,32 +12,52 @@ A Figma-like collaborative canvas MVP built with React, Firebase, and Konva.js.
 - **[tasks.md](./tasks.md)** - Detailed task breakdown and PR workflow
 - **[App README](./collabcanvas/README.md)** - Development setup and instructions
 
-## 🎯 MVP Features
+## 🎯 Features
 
+### Core Functionality ✅
 - ✅ Real-time multi-user collaborative canvas
 - ✅ Google OAuth authentication
-- ✅ Rectangle shape creation and manipulation
-- ✅ Live cursor synchronization
+- ✅ Multiple shape types: Rectangles, Circles, Lines, Text
+- ✅ Live cursor synchronization (sub-50ms via RTDB)
 - ✅ User presence tracking
 - ✅ Owner controls with priority locking
 - ✅ Persistent canvas state
+
+### Advanced Features ✅
+- ✅ Multi-select with selection box
+- ✅ Resize & rotate transforms
+- ✅ Copy/Paste/Duplicate (Ctrl+C/V/D)
+- ✅ Arrow key movement (1px or 10px with Shift)
+- ✅ Undo/Redo (Ctrl+Z/Y, 10-step history)
+- ✅ Layers panel with drag-to-reorder
+- ✅ AI Canvas Agent (natural language commands)
+- ✅ Users online button with dropdown
+
+### In Development 🚧
+- 🚧 Shape Comments (PR #23) - Right-click shapes to add/edit/delete comments (100 char limit, undo support)
 
 ## 🛠️ Tech Stack
 
 - **Frontend:** React 19 + Vite
 - **Canvas Rendering:** Konva.js
-- **Backend:** Firebase (Firestore + Auth + Hosting)
-- **Real-time Sync:** Firestore onSnapshot listeners
+- **Backend:** Firebase (Firestore + RTDB + Auth + Hosting)
+- **Real-time Sync:** Hybrid architecture (Firestore + Realtime Database)
+  - Firestore: Persistent data (shapes, comments, metadata)
+  - RTDB: Ephemeral data (cursors, presence, temp updates)
 
 ## 📋 Development Progress
 
-### ✅ PR #1: Project Setup & Firebase Configuration (Complete)
-- React + Vite initialized
-- Firebase & Konva dependencies installed
-- Firebase project configured with Firestore and Auth
-- Deployed to Firebase Hosting
+See [tasks.md](./tasks.md) for complete PR breakdown and implementation details.
 
-### 🚧 Next Up: PR #2 - Google OAuth Authentication
+### Recently Completed ✅
+- **PR #30:** Hybrid RTDB Architecture (sub-50ms performance)
+- **PR #26-29:** AI Canvas Agent with GPT-4 Turbo integration
+- **PR #24:** Users Online Button
+- **PR #21:** Undo/Redo System
+- **PR #18-20:** Multi-select, Transforms, Copy/Paste, Arrow Keys
+
+### Currently In Development 🚧
+- **PR #23:** Shape Comments System (context menu based)
 
 ## 🏃 Quick Start
 
