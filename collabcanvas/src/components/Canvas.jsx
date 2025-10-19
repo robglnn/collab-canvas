@@ -1157,6 +1157,95 @@ export default function Canvas() {
   }, []);
 
   /**
+   * Download canvas as PNG or SVG
+   * Exports the entire 5000x5000px canvas
+   */
+  const handleDownloadCanvas = useCallback((format) => {
+    try {
+      const stage = stageRef.current;
+      if (!stage) {
+        console.error('Stage ref not available for download');
+        return;
+      }
+
+      console.log(`Starting canvas download as ${format}...`);
+
+      // Generate timestamp for filename (YYYYMMDD-HHMMSS)
+      const now = new Date();
+      const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+      const filename = `canvas-${timestamp}.${format}`;
+
+      // Save original position and scale
+      const originalPos = stage.position();
+      const originalScale = stage.scale();
+      
+      // Temporarily reset stage position and scale to export full canvas
+      stage.position({ x: 0, y: 0 });
+      stage.scale({ x: 1, y: 1 });
+
+      // Use requestAnimationFrame to ensure stage has redrawn before export
+      requestAnimationFrame(() => {
+        try {
+          // Export based on format - capture the full 5000x5000 canvas area
+          let dataURL;
+          if (format === 'svg') {
+            dataURL = stage.toDataURL({ 
+              mimeType: 'image/svg+xml',
+              x: 0,
+              y: 0,
+              width: 5000,
+              height: 5000,
+              pixelRatio: 1
+            });
+          } else {
+            // PNG
+            dataURL = stage.toDataURL({ 
+              x: 0,
+              y: 0,
+              width: 5000,
+              height: 5000,
+              pixelRatio: 1
+            });
+          }
+
+          // Restore original position and scale
+          stage.position(originalPos);
+          stage.scale(originalScale);
+
+          // Trigger download
+          const link = document.createElement('a');
+          link.download = filename;
+          link.href = dataURL;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+
+          console.log(`Canvas exported as ${format.toUpperCase()}: ${filename}`);
+        } catch (error) {
+          // Restore original position/scale even if export fails
+          stage.position(originalPos);
+          stage.scale(originalScale);
+          console.error('Error exporting canvas:', error);
+        }
+      });
+    } catch (error) {
+      console.error('Error downloading canvas:', error);
+    }
+  }, []);
+
+  // Expose download handler to parent
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.downloadCanvas = handleDownloadCanvas;
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete window.downloadCanvas;
+      }
+    };
+  }, [handleDownloadCanvas]);
+
+  /**
    * Handle shape right-click
    */
   const handleShapeRightClick = (shape, position) => {

@@ -353,8 +353,7 @@
   line-height: 1;
 }
 
-.zoom-emoji {
-  font-size: 14px;
+.zoom-icon {
   margin-bottom: 2px;
 }
 
@@ -400,7 +399,7 @@
   }
 
   /* Show zoom button content on mobile - needs higher specificity */
-  .toolbar-btn .zoom-emoji,
+  .toolbar-btn .zoom-icon,
   .toolbar-btn .zoom-percent {
     display: block !important;
   }

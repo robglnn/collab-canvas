@@ -7,10 +7,13 @@ import './Auth.css';
  * Displays sign-in page when user is not authenticated
  * Shows user info and sign-out button when authenticated
  */
-export default function Auth({ children, usersButton, onBeforeSignOut }) {
+export default function Auth({ children, usersButton, onBeforeSignOut, onDownloadCanvas }) {
   const { user, loading, error, signInWithGoogle, signOut } = useAuth();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isDownloadMenuOpen, setIsDownloadMenuOpen] = useState(false);
+  const [isDownloadCooldown, setIsDownloadCooldown] = useState(false);
   const userMenuRef = useRef(null);
+  const downloadMenuRef = useRef(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -18,13 +21,16 @@ export default function Auth({ children, usersButton, onBeforeSignOut }) {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
         setIsUserMenuOpen(false);
       }
+      if (downloadMenuRef.current && !downloadMenuRef.current.contains(event.target)) {
+        setIsDownloadMenuOpen(false);
+      }
     };
 
-    if (isUserMenuOpen) {
+    if (isUserMenuOpen || isDownloadMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [isUserMenuOpen]);
+  }, [isUserMenuOpen, isDownloadMenuOpen]);
 
   const handleSignOut = async () => {
     setIsUserMenuOpen(false);
@@ -32,6 +38,24 @@ export default function Auth({ children, usersButton, onBeforeSignOut }) {
       await onBeforeSignOut();
     }
     signOut();
+  };
+
+  const handleDownload = (format) => {
+    if (isDownloadCooldown) return;
+    
+    // Close menu
+    setIsDownloadMenuOpen(false);
+    
+    // Trigger download
+    if (onDownloadCanvas) {
+      onDownloadCanvas(format);
+    }
+    
+    // Start cooldown
+    setIsDownloadCooldown(true);
+    setTimeout(() => {
+      setIsDownloadCooldown(false);
+    }, 5000);
   };
 
   // Show loading spinner while checking auth state
@@ -87,6 +111,43 @@ export default function Auth({ children, usersButton, onBeforeSignOut }) {
         </div>
         
         <div className="header-right">
+          {/* Download canvas button */}
+          <div className="download-menu-container" ref={downloadMenuRef}>
+            <button 
+              className={`download-button ${isDownloadCooldown ? 'disabled' : ''}`}
+              onClick={() => setIsDownloadMenuOpen(!isDownloadMenuOpen)}
+              title={isDownloadCooldown ? 'Please wait 5 seconds' : 'Download Canvas'}
+              disabled={isDownloadCooldown}
+            >
+              📥
+            </button>
+
+            {/* Download dropdown menu */}
+            {isDownloadMenuOpen && (
+              <div className="download-dropdown">
+                <div className="download-dropdown-header">
+                  Download Canvas
+                </div>
+                <div className="download-options">
+                  <button 
+                    className="download-option-btn"
+                    onClick={() => handleDownload('png')}
+                    title="Download as PNG"
+                  >
+                    PNG
+                  </button>
+                  <button 
+                    className="download-option-btn"
+                    onClick={() => handleDownload('svg')}
+                    title="Download as SVG"
+                  >
+                    SVG
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Users online button */}
           {usersButton}
           

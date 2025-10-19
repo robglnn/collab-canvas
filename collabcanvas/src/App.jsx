@@ -42,6 +42,13 @@ function App() {
     await removeCursor(); // Remove cursor
   };
 
+  // Handle canvas download
+  const handleDownloadCanvas = (format) => {
+    if (typeof window !== 'undefined' && window.downloadCanvas) {
+      window.downloadCanvas(format);
+    }
+  };
+
   // Show kicked message if user was removed
   if (wasKicked) {
     return (
@@ -67,6 +74,7 @@ function App() {
   return (
     <Auth 
       onBeforeSignOut={handleBeforeSignOut}
+      onDownloadCanvas={handleDownloadCanvas}
       usersButton={user && (
         <UserList 
           users={users} 

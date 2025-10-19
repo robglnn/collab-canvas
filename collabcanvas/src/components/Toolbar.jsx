@@ -429,7 +429,10 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
             title={isDebugExpanded ? 'Hide debug info' : `Zoom: ${(debugData.zoom * 100).toFixed(0)}% (click for debug)`}
           >
             <div className="zoom-btn-content">
-              <span className="zoom-emoji">🔍</span>
+              <svg className="zoom-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="M21 21l-4.35-4.35"/>
+              </svg>
               <span className="zoom-percent">{(debugData.zoom * 100).toFixed(0)}%</span>
             </div>
           </button>
