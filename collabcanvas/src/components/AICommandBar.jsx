@@ -20,7 +20,6 @@ import './AICommandBar.css';
  * @param {boolean} isOnCooldown - Whether user is in cooldown period
  */
 export default function AICommandBar({ onSubmit, isProcessing = false, showSuccess = false, cooldownRemaining = 0, isOnCooldown = false }) {
-  const [isExpanded, setIsExpanded] = useState(true);
   const [command, setCommand] = useState('');
   const [showCharCount, setShowCharCount] = useState(false);
   const textareaRef = useRef(null);
@@ -90,10 +89,6 @@ export default function AICommandBar({ onSubmit, isProcessing = false, showSucce
     }
   };
 
-  const toggleExpanded = () => {
-    setIsExpanded(!isExpanded);
-  };
-
   const clearCommand = () => {
     setCommand('');
   };
@@ -123,24 +118,9 @@ export default function AICommandBar({ onSubmit, isProcessing = false, showSucce
   }
 
   return (
-    <div className={`ai-command-bar ${isExpanded ? 'expanded' : 'collapsed'}`}>
-      {/* Header with toggle */}
-      <div className="ai-command-header" onClick={toggleExpanded}>
-        <div className="ai-command-title">
-          <span className="ai-icon">🤖</span>
-          <span>AI Assistant</span>
-        </div>
-        <button 
-          className="ai-command-toggle"
-          title={isExpanded ? 'Collapse' : 'Expand'}
-        >
-          {isExpanded ? '▼' : '▶'}
-        </button>
-      </div>
-
-      {/* Input area (only visible when expanded) */}
-      {isExpanded && (
-        <div className="ai-command-body">
+    <div className="ai-command-bar expanded">
+      {/* Input area */}
+      <div className="ai-command-body">
           <textarea
             ref={textareaRef}
             className="ai-command-input"
@@ -182,7 +162,6 @@ export default function AICommandBar({ onSubmit, isProcessing = false, showSucce
             )}
           </button>
         </div>
-      )}
     </div>
   );
 }

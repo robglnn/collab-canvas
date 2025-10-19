@@ -32,9 +32,10 @@
 .toolbar-btn {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  width: 100%;
-  padding: 0.75rem 1rem;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0.75rem;
   background: white;
   border: 2px solid #e0e0e0;
   border-radius: 8px;
@@ -315,78 +316,72 @@
   }
 }
 
+/* Color Picker Submenu Animation */
+.toolbar-section {
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+  }
+  to {
+    opacity: 1;
+    max-height: 1000px;
+  }
+}
+
 /* Debug/Zoom Button Container - Pushes to bottom */
 .toolbar-debug-container {
   margin-top: auto;
   padding-top: 1rem;
+  padding-bottom: 1rem;
 }
 
-.toolbar-debug-btn {
-  width: 100%;
+/* Zoom button - square like other tools */
+.zoom-btn {
+  margin-bottom: 0;
+}
+
+.zoom-btn-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  line-height: 1;
+}
+
+.zoom-emoji {
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.zoom-percent {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Debug panel - appears below zoom button */
+.debug-panel {
+  margin-top: 0.5rem;
   background: rgba(0, 0, 0, 0.85);
   color: white;
-  border: none;
   border-radius: 8px;
-  padding: 0;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  overflow: hidden;
-}
-
-.toolbar-debug-btn:hover {
-  background: rgba(0, 0, 0, 0.95);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
-
-.toolbar-debug-btn:active {
-  transform: translateY(0);
-}
-
-/* Compact view (default) */
-.debug-compact {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
   padding: 0.75rem;
-  font-weight: 600;
-  font-size: 1rem;
+  animation: slideDown 0.2s ease-out;
 }
 
-.debug-compact svg {
-  flex-shrink: 0;
-}
-
-/* Expanded view */
-.debug-expanded {
-  padding: 0.75rem;
-  text-align: left;
-}
-
-.debug-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
-  font-size: 0.875rem;
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.debug-header svg {
-  flex-shrink: 0;
-}
-
-.debug-content {
+.debug-panel-content {
   font-family: 'Courier New', monospace;
-  font-size: 0.75rem;
-  line-height: 1.6;
+  font-size: 0.7rem;
+  line-height: 1.5;
 }
 
-.debug-content div {
-  margin: 0.25rem 0;
+.debug-panel-content div {
+  margin: 0.2rem 0;
+  word-break: break-all;
 }
 
 /* Responsive */
@@ -404,6 +399,12 @@
     display: none;
   }
 
+  /* Show zoom button content on mobile - needs higher specificity */
+  .toolbar-btn .zoom-emoji,
+  .toolbar-btn .zoom-percent {
+    display: block !important;
+  }
+
   .toolbar-btn {
     padding: 0.75rem;
     justify-content: center;
@@ -413,7 +414,7 @@
     display: none;
   }
 
-  .debug-compact span {
+  .debug-panel {
     display: none;
   }
 }

@@ -34,6 +34,8 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
   const [selectedColor, setSelectedColor] = useState('#000000'); // Default black
   const [hexInput, setHexInput] = useState('#000000');
   const [hexError, setHexError] = useState('');
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
+  const [isAIBarOpen, setIsAIBarOpen] = useState(false);
 
   // Default color palette (10 colors)
   const defaultColors = [
@@ -166,15 +168,22 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
 
   return (
     <div className="toolbar">
-      {/* AI Command Bar (passed as children) */}
-      {children && (
-        <div className="toolbar-section">
-          {children}
-        </div>
-      )}
-      
       <div className="toolbar-section">
         <h3 className="toolbar-title">Tools</h3>
+        
+        {/* AI Assistant Button */}
+        <button
+          className={`toolbar-btn ${isAIBarOpen ? 'active' : ''}`}
+          onClick={() => setIsAIBarOpen(!isAIBarOpen)}
+          title="AI Assistant"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2C10.9 2 10 2.9 10 4C10 4.7 10.4 5.3 11 5.6V7H9C7.3 7 6 8.3 6 10V12C6 13.7 7.3 15 9 15H11V18.4C10.4 18.7 10 19.3 10 20C10 21.1 10.9 22 12 22C13.1 22 14 21.1 14 20C14 19.3 13.6 18.7 13 18.4V15H15C16.7 15 18 13.7 18 12V10C18 8.3 16.7 7 15 7H13V5.6C13.6 5.3 14 4.7 14 4C14 2.9 13.1 2 12 2Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+            <circle cx="9" cy="10" r="1.5" fill="currentColor"/>
+            <circle cx="15" cy="10" r="1.5" fill="currentColor"/>
+            <path d="M9 12.5C9 12.5 10 13.5 12 13.5C14 13.5 15 12.5 15 12.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        </button>
         
         <button
           className={`toolbar-btn ${isPlaceMode && activeShape === 'rectangle' ? 'active' : ''}`}
@@ -184,7 +193,6 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
             <rect x="4" y="6" width="16" height="12" stroke="currentColor" strokeWidth="2" rx="1"/>
           </svg>
-          <span>Rectangle</span>
         </button>
 
         <button
@@ -195,7 +203,6 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2"/>
           </svg>
-          <span>Circle</span>
         </button>
 
         <button
@@ -206,7 +213,6 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
             <text x="12" y="16" fontSize="14" textAnchor="middle" fill="currentColor" fontWeight="bold">T</text>
           </svg>
-          <span>Text</span>
         </button>
 
         <button
@@ -217,11 +223,33 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
             <line x1="4" y1="18" x2="20" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
           </svg>
-          <span>Line</span>
+        </button>
+
+        <button
+          className={`toolbar-btn ${isColorPickerOpen ? 'active' : ''}`}
+          onClick={() => setIsColorPickerOpen(!isColorPickerOpen)}
+          title="Color Picker"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2C10.9 2 10 2.9 10 4C10 4.7 10.4 5.4 11 5.7V7C8.2 7.4 6 9.7 6 12.5C6 15.5 8.5 18 11.5 18H12.5C15.5 18 18 15.5 18 12.5C18 9.7 15.8 7.4 13 7V5.7C13.6 5.4 14 4.7 14 4C14 2.9 13.1 2 12 2Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+            <circle cx="9" cy="11" r="1" fill="currentColor"/>
+            <circle cx="15" cy="11" r="1" fill="currentColor"/>
+            <circle cx="12" cy="9" r="1" fill="currentColor"/>
+            <circle cx="9" cy="14" r="1" fill="currentColor"/>
+            <circle cx="15" cy="14" r="1" fill="currentColor"/>
+          </svg>
         </button>
       </div>
 
-      {/* Color Picker */}
+      {/* AI Command Bar - Collapsible */}
+      {isAIBarOpen && children && (
+        <div className="toolbar-section">
+          {children}
+        </div>
+      )}
+
+      {/* Color Picker - Collapsible */}
+      {isColorPickerOpen && (
       <div className="toolbar-section">
         <h3 className="toolbar-title">Colors</h3>
         
@@ -289,6 +317,7 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
           <span className="current-color-label">{selectedColor}</span>
         </div>
       </div>
+      )}
 
       {/* Line Width Controls - Show when creating line OR when line is selected */}
       {((isPlaceMode && activeShape === 'line') || selectedLine) && (
@@ -402,43 +431,35 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
         </div>
       )}
 
-      {/* Debug/Zoom button at bottom */}
+      {/* Zoom indicator button at bottom */}
       {debugData && (
         <div className="toolbar-debug-container">
           <button
-            className={`toolbar-debug-btn ${isDebugExpanded ? 'expanded' : ''}`}
+            className={`toolbar-btn zoom-btn ${isDebugExpanded ? 'active' : ''}`}
             onClick={onToggleDebug}
-            title={isDebugExpanded ? 'Click to collapse' : 'Click to expand debug info'}
+            title={isDebugExpanded ? 'Hide debug info' : `Zoom: ${(debugData.zoom * 100).toFixed(0)}% (click for debug)`}
           >
-            {isDebugExpanded ? (
-              <div className="debug-expanded">
-                <div className="debug-header">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <path d="M19 9l-7 7-7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  <span>Debug Info</span>
-                </div>
-                <div className="debug-content">
-                  <div>Zoom: {(debugData.zoom * 100).toFixed(0)}%</div>
-                  <div>Canvas Center: ({debugData.canvasCenter.x}, {debugData.canvasCenter.y})</div>
-                  <div>Cursor: ({debugData.cursor.x}, {debugData.cursor.y})</div>
-                  <div>Stage Offset: ({debugData.stageOffset.x}, {debugData.stageOffset.y})</div>
-                  <div>Canvas: {debugData.canvasSize.width}x{debugData.canvasSize.height}px</div>
-                  <div>Shapes: {debugData.shapesCount} | Cursors: {debugData.cursorsCount}</div>
-                  <div>Role: {debugData.role}</div>
-                  {debugData.selectedCount > 0 && <div>Selected: {debugData.selectedCount} shape(s)</div>}
-                </div>
-              </div>
-            ) : (
-              <div className="debug-compact">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2"/>
-                  <path d="M12 8v4l2 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
-                <span>{(debugData.zoom * 100).toFixed(0)}%</span>
-              </div>
-            )}
+            <div className="zoom-btn-content">
+              <span className="zoom-emoji">🔍</span>
+              <span className="zoom-percent">{(debugData.zoom * 100).toFixed(0)}%</span>
+            </div>
           </button>
+          
+          {/* Debug info panel (when expanded) */}
+          {isDebugExpanded && (
+            <div className="debug-panel">
+              <div className="debug-panel-content">
+                <div>Zoom: {(debugData.zoom * 100).toFixed(0)}%</div>
+                <div>Canvas Center: ({debugData.canvasCenter.x}, {debugData.canvasCenter.y})</div>
+                <div>Cursor: ({debugData.cursor.x}, {debugData.cursor.y})</div>
+                <div>Stage Offset: ({debugData.stageOffset.x}, {debugData.stageOffset.y})</div>
+                <div>Canvas: {debugData.canvasSize.width}x{debugData.canvasSize.height}px</div>
+                <div>Shapes: {debugData.shapesCount} | Cursors: {debugData.cursorsCount}</div>
+                <div>Role: {debugData.role}</div>
+                {debugData.selectedCount > 0 && <div>Selected: {debugData.selectedCount} shape(s)</div>}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
