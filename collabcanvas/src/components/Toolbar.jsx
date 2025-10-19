@@ -420,14 +420,6 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
         </div>
       )}
 
-      {isPlaceMode && (
-        <div className="toolbar-hint">
-          {activeShape === 'line' 
-            ? 'Click twice on canvas to draw a line' 
-            : `Click on canvas to place ${activeShape}`}
-        </div>
-      )}
-
       {/* Zoom indicator button at bottom */}
       {debugData && (
         <div className="toolbar-debug-container">

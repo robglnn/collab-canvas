@@ -127,7 +127,7 @@ export default function AICommandBar({ onSubmit, isProcessing = false, showSucce
             value={command}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Type command here... (e.g., 'Create 3 blue circles in a row')"
+            placeholder="Type command here..."
             disabled={isProcessing}
             rows={1}
           />

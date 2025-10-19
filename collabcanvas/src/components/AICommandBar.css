@@ -71,11 +71,13 @@
   font-size: 13px;
   line-height: 1.5;
   resize: none;
-  min-height: 38px;
+  min-height: 100px;
   max-height: 120px;
   overflow-y: auto;
   transition: border-color 0.2s ease;
+  margin-top: 8px;
   margin-bottom: 8px;
+  box-sizing: border-box;
 }
 
 .ai-command-input:focus {
