@@ -83,7 +83,7 @@ export default function Auth({ children, usersButton, onBeforeSignOut }) {
     <div className="app-container">
       <header className="app-header">
         <div className="header-left">
-          <h2>CollabCanvas</h2>
+          <h2>CollabCanvas 🎨</h2>
         </div>
         
         <div className="header-right">
