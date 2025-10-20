@@ -120,16 +120,17 @@ const Shape = memo(function Shape({
   };
 
   /**
-   * Handle drag end - update shape position
+   * Handle drag move - for lines, keep position at 0,0 and update points visually
    */
-  const handleDragEnd = (e) => {
+  const handleDragMove = (e) => {
     if (!canEdit) return;
     
     if (shape.type === 'line') {
-      // For lines, move both endpoints by the drag delta
-      const deltaX = e.target.x() - shape.x;
-      const deltaY = e.target.y() - shape.y;
+      // Get current drag position
+      const deltaX = e.target.x();
+      const deltaY = e.target.y();
       
+      // Update points to new absolute positions (for visual rendering)
       const updatedPoints = [
         shape.points[0] + deltaX,
         shape.points[1] + deltaY,
@@ -137,13 +138,35 @@ const Shape = memo(function Shape({
         shape.points[3] + deltaY,
       ];
       
+      // Update Konva node directly without triggering onChange (avoid excessive Firestore writes)
+      e.target.points(updatedPoints);
+      
+      // Reset Konva position to 0,0 immediately to prevent visual jump
+      e.target.position({ x: 0, y: 0 });
+    }
+  };
+
+  /**
+   * Handle drag end - update shape position
+   */
+  const handleDragEnd = (e) => {
+    if (!canEdit) return;
+    
+    if (shape.type === 'line') {
+      // For lines, save the updated points (already updated in dragMove)
+      const finalPoints = e.target.points();
+      
       onChange({
         ...shape,
-        x: e.target.x(),
-        y: e.target.y(),
-        points: updatedPoints,
+        x: 0,
+        y: 0,
+        points: finalPoints,
       });
+      
+      // Ensure Konva node is at 0,0
+      e.target.position({ x: 0, y: 0 });
     } else {
+      // For other shapes, update position normally
       onChange({
         ...shape,
         x: e.target.x(),
@@ -256,6 +279,7 @@ const Shape = memo(function Shape({
     onDblClick: handleDblClick, // Double-click to edit text
     onContextMenu: handleRightClick,
     onDragStart: handleDragStart,
+    onDragMove: handleDragMove, // Handle drag move for smooth line dragging
     onDragEnd: handleDragEnd,
     onTransformEnd: handleTransformEnd,
     onMouseEnter: () => {
