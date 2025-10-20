@@ -752,10 +752,16 @@ export default function Canvas() {
     const scaledCanvasWidth = CANVAS_WIDTH * scale;
     const scaledCanvasHeight = CANVAS_HEIGHT * scale;
 
+    // Get toolbar width to adjust pan boundaries
+    // This allows users to pan right so canvas edge clears the toolbar
+    const toolbar = document.querySelector('.toolbar');
+    const toolbarWidth = toolbar ? toolbar.offsetWidth : 0;
+
     // Calculate boundaries - ensure canvas edges never go past viewport edges
-    // maxX/maxY = 0 means canvas top-left can't go right/down from viewport top-left
+    // maxX allows panning right by toolbar width so left edge is fully visible
+    // maxY = 0 means canvas top can't go below viewport top
     // minX/minY ensures canvas bottom-right never goes left/up from viewport bottom-right
-    const maxX = 0;
+    const maxX = toolbarWidth;
     const minX = Math.min(0, stageDimensions.width - scaledCanvasWidth);
     const maxY = 0;
     const minY = Math.min(0, stageDimensions.height - scaledCanvasHeight);
