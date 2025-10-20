@@ -374,9 +374,15 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
                 // Send to RTDB for real-time sync to other users (sub-100ms)
                 if (selectedLine && onLineWidthInput) {
                   onLineWidthInput(selectedLine.id, newWidth);
+                } else if (!selectedLine) {
+                  // Update line width for line creation mode
+                  setLineWidth(newWidth);
+                  if (typeof window !== 'undefined' && window.updateLineWidth) {
+                    window.updateLineWidth(newWidth);
+                  }
                 }
               }}
-              onChange={(e) => {
+              onMouseUp={(e) => {
                 const newWidth = parseInt(e.target.value);
                 
                 if (selectedLine) {
@@ -385,17 +391,16 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
                     onUpdateLineWidth(selectedLine.id, newWidth);
                   }
                   setTempLineWidth(null); // Clear temp value after update
-                } else {
-                  // Update line width for line creation mode
-                  setLineWidth(newWidth);
-                  if (typeof window !== 'undefined' && window.updateLineWidth) {
-                    window.updateLineWidth(newWidth);
-                  }
                 }
               }}
-              onMouseUp={() => {
-                // Also clear temp value on mouse up
-                if (tempLineWidth !== null && selectedLine) {
+              onPointerUp={(e) => {
+                // Handle touch/pen devices
+                const newWidth = parseInt(e.target.value);
+                
+                if (selectedLine && tempLineWidth !== null) {
+                  if (onUpdateLineWidth) {
+                    onUpdateLineWidth(selectedLine.id, newWidth);
+                  }
                   setTempLineWidth(null);
                 }
               }}

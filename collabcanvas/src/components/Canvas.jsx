@@ -139,8 +139,8 @@ export default function Canvas() {
   // Cursors hook - pass online user IDs to filter cursors
   const { cursors, updateCursorPosition, removeCursor } = useCursors(onlineUserIds);
 
-  // Note: RTDB temp updates for shapes temporarily disabled for reliability
-  // Will be re-enabled in Option B with proper debouncing
+  // RTDB hook for temporary updates (line width slider)
+  const { writeTempUpdate, clearTempUpdate } = useRTDB();
 
   // History hook for undo/redo
   const { canUndo, canRedo, takeSnapshot, undo, redo, clearHistory } = useHistory();
@@ -686,9 +686,11 @@ export default function Canvas() {
         // For lines, check if any point is within selection box
         if (!shape.points || shape.points.length < 4) return false;
         
-        // Get line bounding box
-        const xCoords = shape.points.filter((_, i) => i % 2 === 0);
-        const yCoords = shape.points.filter((_, i) => i % 2 === 1);
+        // Get line bounding box (points are relative to shape.x, shape.y in Konva)
+        const lineX = shape.x || 0;
+        const lineY = shape.y || 0;
+        const xCoords = shape.points.filter((_, i) => i % 2 === 0).map(x => x + lineX);
+        const yCoords = shape.points.filter((_, i) => i % 2 === 1).map(y => y + lineY);
         const lineLeft = Math.min(...xCoords);
         const lineRight = Math.max(...xCoords);
         const lineTop = Math.min(...yCoords);
@@ -1230,25 +1232,40 @@ export default function Canvas() {
       dragSnapshotTakenRef.current = true;
     }
     
-    // If this is a selected shape and multiple shapes are selected, move all together
+    // If this is a selected shape and multiple shapes are selected, check if we should move all together
     if (selectedShapeIds.includes(updatedShape.id) && selectedShapeIds.length > 1) {
-      // Find the original shape to calculate delta
+      // Find the original shape to check what changed
       const originalShape = shapes.find(s => s.id === updatedShape.id);
       if (originalShape) {
-        const deltaX = updatedShape.x - originalShape.x;
-        const deltaY = updatedShape.y - originalShape.y;
+        // Detect if this is a simple drag (only position changed) vs transform (size/rotation changed)
+        const isDrag = (
+          updatedShape.width === originalShape.width &&
+          updatedShape.height === originalShape.height &&
+          updatedShape.radius === originalShape.radius &&
+          updatedShape.rotation === originalShape.rotation &&
+          JSON.stringify(updatedShape.points) === JSON.stringify(originalShape.points) &&
+          updatedShape.scaleX === originalShape.scaleX &&
+          updatedShape.scaleY === originalShape.scaleY
+        );
+        
+        if (isDrag) {
+          // Simple drag - move all selected shapes together
+          const deltaX = updatedShape.x - originalShape.x;
+          const deltaY = updatedShape.y - originalShape.y;
 
-        // Update all selected shapes with the same delta
-        selectedShapeIds.forEach(shapeId => {
-          const shape = shapes.find(s => s.id === shapeId);
-          if (shape) {
-            updateShape(shapeId, {
-              ...shape,
-              x: shape.x + deltaX,
-              y: shape.y + deltaY,
-            });
-          }
-        });
+          selectedShapeIds.forEach(shapeId => {
+            const shape = shapes.find(s => s.id === shapeId);
+            if (shape) {
+              updateShape(shapeId, {
+                x: shape.x + deltaX,
+                y: shape.y + deltaY,
+              });
+            }
+          });
+        } else {
+          // Transform (resize/rotate) - only update the transformed shape
+          updateShape(updatedShape.id, updatedShape);
+        }
       }
     } else {
       // Single shape update

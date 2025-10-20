@@ -297,6 +297,7 @@ const Shape = memo(function Shape({
             {...commonProps}
             points={shape.points || [0, 0, 100, 100]}
             stroke={shape.stroke || '#000000'}
+            strokeWidth={shape.strokeWidth || 3}
             lineCap="round"
             lineJoin="round"
             hitStrokeWidth={Math.max(20, shape.strokeWidth || 3)} // Wider hit area for easier selection
