@@ -75,9 +75,9 @@ export function useAI(canvasContext) {
       console.log('Submitting AI command:', command);
       console.log('Canvas context:', context);
 
-      // Call OpenAI with command and function schemas with 10-second timeout
+      // Call OpenAI with command and function schemas with 5-minute timeout
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('AI command timeout after 10 seconds')), 10000)
+        setTimeout(() => reject(new Error('AI command timeout after 5 minutes')), 300000)
       );
       
       const response = await Promise.race([
@@ -97,7 +97,7 @@ export function useAI(canvasContext) {
       // Handle function calls with timeout
       if (message.tool_calls && message.tool_calls.length > 0) {
         const executionTimeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('AI execution timeout after 10 seconds')), 10000)
+          setTimeout(() => reject(new Error('AI execution timeout after 5 minutes')), 300000)
         );
         
         const results = await Promise.race([
