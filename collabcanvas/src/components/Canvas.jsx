@@ -28,8 +28,10 @@ import './Canvas.css';
  * Create: Click toolbar button, then click canvas to place
  * Select: Click on shape
  * Delete: Select shape, press Delete key
+ * 
+ * @param {string} canvasId - Canvas ID for multi-canvas support
  */
-export default function Canvas() {
+export default function Canvas({ canvasId }) {
   const stageRef = useRef(null);
   const containerRef = useRef(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -126,7 +128,7 @@ export default function Canvas() {
     updateShapesZIndex,
     bringToFront,
     sendToBack,
-  } = useCanvas();
+  } = useCanvas(canvasId);
 
   // Presence hook - to get user names for lock labels
   const { users } = usePresence(ownerId);

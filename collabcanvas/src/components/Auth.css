@@ -342,6 +342,17 @@
   background: #f3f4f6;
 }
 
+.user-dropdown-item.disabled,
+.user-dropdown-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.user-dropdown-item.disabled:hover,
+.user-dropdown-item:disabled:hover {
+  background: transparent;
+}
+
 .user-dropdown-item.signout-item:hover {
   background: #fee2e2;
   color: #dc2626;

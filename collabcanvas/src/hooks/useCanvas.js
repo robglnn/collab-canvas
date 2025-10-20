@@ -12,17 +12,25 @@ import {
   forceOverrideLock as forceOverrideLockInFirestore,
   setCanvasOwner,
   getCanvasOwner,
+  addShapeToCanvas,
+  updateShapeInCanvas,
+  deleteShapeFromCanvas,
+  getCanvasMetadata,
+  lockShapeInCanvas,
+  unlockShapeInCanvas,
+  forceOverrideLockInCanvas,
 } from '../lib/firestoreService';
 
 /**
  * Custom hook to manage canvas state with Firestore integration
  * Handles optimistic updates with rollback on errors
  * 
+ * @param {string} canvasId - Canvas ID for multi-canvas support
  * @returns {Object} Canvas state and methods
  */
-export function useCanvas() {
+export function useCanvas(canvasId) {
   const { user } = useAuth();
-  const { shapes: firestoreShapes, canvasMetadata, loading, isConnected, showDisconnectBanner } = useFirestore();
+  const { shapes: firestoreShapes, canvasMetadata, loading, isConnected, showDisconnectBanner } = useFirestore(canvasId);
   
   const [selectedShapeIds, setSelectedShapeIds] = useState([]);
   const [isOwner, setIsOwner] = useState(false);
@@ -33,28 +41,16 @@ export function useCanvas() {
 
   // Set up canvas owner logic
   useEffect(() => {
-    if (!user) return;
+    if (!user || !canvasId) return;
 
     const initializeOwner = async () => {
       try {
-        const currentOwner = await getCanvasOwner();
+        const metadata = await getCanvasMetadata(canvasId);
         
-        if (!currentOwner) {
-          // No owner yet - this user becomes owner
-          await setCanvasOwner(user.uid);
-          setIsOwner(true);
-          setOwnerId(user.uid);
-          console.log('User is now canvas owner');
-        } else if (currentOwner === user.uid) {
-          // User is the owner
-          setIsOwner(true);
-          setOwnerId(currentOwner);
-          console.log('User is canvas owner');
-        } else {
-          // User is a collaborator
-          setIsOwner(false);
-          setOwnerId(currentOwner);
-          console.log('User is collaborator');
+        if (metadata) {
+          setOwnerId(metadata.ownerId);
+          setIsOwner(metadata.ownerId === user.uid);
+          console.log('Canvas owner:', metadata.ownerId, 'User is owner:', metadata.ownerId === user.uid);
         }
       } catch (error) {
         console.error('Error initializing owner:', error);
@@ -62,7 +58,7 @@ export function useCanvas() {
     };
 
     initializeOwner();
-  }, [user]);
+  }, [user, canvasId]);
 
   // Update isOwner when metadata changes
   useEffect(() => {
@@ -89,7 +85,7 @@ export function useCanvas() {
    * CONSERVATIVE: Only unlocks if user has been offline for a while
    */
   useEffect(() => {
-    if (!user) return;
+    if (!user || !canvasId) return;
 
     // Track recently unlocked shapes to avoid redundant unlocks
     const recentlyUnlocked = new Set();
@@ -101,7 +97,7 @@ export function useCanvas() {
         if (currentShapes.length === 0) return;
 
         // Get all presence documents to check who's online
-        const presenceRef = collection(db, 'canvases', 'main', 'presence');
+        const presenceRef = collection(db, 'canvases', canvasId, 'presence');
         const presenceSnapshot = await getDocs(presenceRef);
         
         const onlineUserIds = new Set();
@@ -146,7 +142,11 @@ export function useCanvas() {
           }
 
           console.log(`Unlocking shape ${shape.id} - user ${shape.lockedBy} offline for >30s`);
-          await unlockShapeInFirestore(shape.id);
+          if (canvasId) {
+            await unlockShapeInCanvas(canvasId, shape.id);
+          } else {
+            await unlockShapeInFirestore(shape.id);
+          }
           
           // Mark as recently unlocked for 60 seconds
           recentlyUnlocked.add(unlockKey);
@@ -167,7 +167,7 @@ export function useCanvas() {
       clearInterval(interval);
       clearTimeout(initialTimer);
     };
-  }, [user]); // Only depend on user, not shapes or selectedShapeIds
+  }, [user, canvasId]); // Only depend on user and canvasId, not shapes or selectedShapeIds
 
   /**
    * Add a new shape with optimistic update
@@ -182,13 +182,17 @@ export function useCanvas() {
 
     try {
       // Optimistic update happens through Firestore listener
-      await addShapeToFirestore(shape, user.uid);
+      if (canvasId) {
+        await addShapeToCanvas(canvasId, shape, user.uid);
+      } else {
+        await addShapeToFirestore(shape, user.uid);
+      }
     } catch (error) {
       console.error('Failed to add shape:', error);
       // Rollback not needed - Firestore never updated
       alert('Failed to create shape. Please try again.');
     }
-  }, [user]);
+  }, [user, canvasId]);
 
   /**
    * Update an existing shape with optimistic update
@@ -208,13 +212,17 @@ export function useCanvas() {
 
     try {
       // Update happens through Firestore listener (optimistic)
-      await updateShapeInFirestore(shapeId, updates);
+      if (canvasId) {
+        await updateShapeInCanvas(canvasId, shapeId, updates);
+      } else {
+        await updateShapeInFirestore(shapeId, updates);
+      }
     } catch (error) {
       console.error('Failed to update shape:', error);
       // Firestore listener will revert to last known state
       alert('Failed to update shape. Please try again.');
     }
-  }, [user, shapes]);
+  }, [user, shapes, canvasId]);
 
   /**
    * Delete shape(s) with optimistic update
@@ -234,13 +242,17 @@ export function useCanvas() {
 
     try {
       // Delete each shape
-      await Promise.all(idsArray.map(id => deleteShapeFromFirestore(id)));
+      if (canvasId) {
+        await Promise.all(idsArray.map(id => deleteShapeFromCanvas(canvasId, id)));
+      } else {
+        await Promise.all(idsArray.map(id => deleteShapeFromFirestore(id)));
+      }
     } catch (error) {
       console.error('Failed to delete shape(s):', error);
       // Firestore listener will restore shapes if delete failed
       alert('Failed to delete shape(s). Please try again.');
     }
-  }, [user]);
+  }, [user, canvasId]);
 
   /**
    * Select shape(s)
@@ -284,16 +296,20 @@ export function useCanvas() {
     try {
       // Update each shape's zIndex in Firestore
       await Promise.all(
-        zIndexUpdates.map(({ id, zIndex }) => 
-          updateShapeInFirestore(id, { zIndex })
-        )
+        zIndexUpdates.map(({ id, zIndex }) => {
+          if (canvasId) {
+            return updateShapeInCanvas(canvasId, id, { zIndex });
+          } else {
+            return updateShapeInFirestore(id, { zIndex });
+          }
+        })
       );
       console.log('Updated zIndex for shapes:', zIndexUpdates);
     } catch (error) {
       console.error('Failed to update zIndex:', error);
       alert('Failed to reorder layers. Please try again.');
     }
-  }, [user]);
+  }, [user, canvasId]);
 
   /**
    * Bring shape(s) to front (set highest zIndex)
@@ -314,16 +330,20 @@ export function useCanvas() {
     try {
       // Assign new zIndex values starting from maxZIndex + 1
       await Promise.all(
-        idsArray.map((id, index) => 
-          updateShapeInFirestore(id, { zIndex: maxZIndex + 1 + index })
-        )
+        idsArray.map((id, index) => {
+          if (canvasId) {
+            return updateShapeInCanvas(canvasId, id, { zIndex: maxZIndex + 1 + index });
+          } else {
+            return updateShapeInFirestore(id, { zIndex: maxZIndex + 1 + index });
+          }
+        })
       );
       console.log('Brought shapes to front:', idsArray);
     } catch (error) {
       console.error('Failed to bring to front:', error);
       alert('Failed to bring to front. Please try again.');
     }
-  }, [user, shapes]);
+  }, [user, shapes, canvasId]);
 
   /**
    * Send shape(s) to back (set lowest zIndex)
@@ -344,16 +364,20 @@ export function useCanvas() {
     try {
       // Assign new zIndex values starting from minZIndex - idsArray.length
       await Promise.all(
-        idsArray.map((id, index) => 
-          updateShapeInFirestore(id, { zIndex: minZIndex - idsArray.length + index })
-        )
+        idsArray.map((id, index) => {
+          if (canvasId) {
+            return updateShapeInCanvas(canvasId, id, { zIndex: minZIndex - idsArray.length + index });
+          } else {
+            return updateShapeInFirestore(id, { zIndex: minZIndex - idsArray.length + index });
+          }
+        })
       );
       console.log('Sent shapes to back:', idsArray);
     } catch (error) {
       console.error('Failed to send to back:', error);
       alert('Failed to send to back. Please try again.');
     }
-  }, [user, shapes]);
+  }, [user, shapes, canvasId]);
 
   /**
    * Deselect all shapes or specific shape(s)
@@ -392,12 +416,16 @@ export function useCanvas() {
     if (!user) return;
     
     try {
-      await lockShapeInFirestore(shapeId, user.uid);
+      if (canvasId) {
+        await lockShapeInCanvas(canvasId, shapeId, user.uid);
+      } else {
+        await lockShapeInFirestore(shapeId, user.uid);
+      }
     } catch (error) {
       console.error('Error locking shape:', error);
       alert('Failed to lock shape. Please try again.');
     }
-  }, [user]);
+  }, [user, canvasId]);
 
   /**
    * Unlock a shape (release lock)
@@ -406,11 +434,15 @@ export function useCanvas() {
    */
   const unlockShape = useCallback(async (shapeId) => {
     try {
-      await unlockShapeInFirestore(shapeId);
+      if (canvasId) {
+        await unlockShapeInCanvas(canvasId, shapeId);
+      } else {
+        await unlockShapeInFirestore(shapeId);
+      }
     } catch (error) {
       console.error('Error unlocking shape:', error);
     }
-  }, []);
+  }, [canvasId]);
 
   /**
    * Force override a lock (owner only)
@@ -424,12 +456,16 @@ export function useCanvas() {
     }
     
     try {
-      await forceOverrideLockInFirestore(shapeId, user.uid);
+      if (canvasId) {
+        await forceOverrideLockInCanvas(canvasId, shapeId, user.uid);
+      } else {
+        await forceOverrideLockInFirestore(shapeId, user.uid);
+      }
     } catch (error) {
       console.error('Error overriding lock:', error);
       alert('Failed to override lock. Please try again.');
     }
-  }, [user, isOwner]);
+  }, [user, isOwner, canvasId]);
 
   /**
    * Check if a shape can be edited by current user

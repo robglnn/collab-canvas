@@ -1,35 +1,83 @@
 import { useState, useEffect, useMemo } from 'react';
 import Auth from './components/Auth';
 import Canvas from './components/Canvas';
+import FilesPage from './components/FilesPage';
+import PermissionDeniedBanner from './components/PermissionDeniedBanner';
 import UserList from './components/UserList';
 import { useAuth } from './hooks/useAuth';
 import { usePresence } from './hooks/usePresence';
 import { useCursors } from './hooks/useCursors';
-import { getCanvasOwner } from './lib/firestoreService';
+import { 
+  checkCanvasPermission, 
+  getCanvasIdByInviteToken, 
+  addCanvasCollaborator,
+  getCanvasMetadata 
+} from './lib/firestoreService';
 import './App.css';
 
 function App() {
   const { user } = useAuth();
+  const [currentPage, setCurrentPage] = useState('files'); // 'files' or 'canvas'
+  const [currentCanvasId, setCurrentCanvasId] = useState(null);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const [ownerId, setOwnerId] = useState(null);
+  const [canvasMetadata, setCanvasMetadata] = useState(null);
 
-  // Get canvas owner ID
+  // Handle invite token from URL
   useEffect(() => {
     if (!user) return;
 
-    const fetchOwner = async () => {
-      try {
-        const owner = await getCanvasOwner();
-        setOwnerId(owner);
-      } catch (error) {
-        console.error('Error fetching owner:', error);
+    const handleInviteToken = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const inviteToken = urlParams.get('invite');
+
+      if (inviteToken) {
+        try {
+          const canvasId = await getCanvasIdByInviteToken(inviteToken);
+          
+          if (canvasId) {
+            // Add user to canvas collaborators
+            await addCanvasCollaborator(canvasId, user.email);
+            
+            // Navigate to canvas
+            setCurrentCanvasId(canvasId);
+            setCurrentPage('canvas');
+            
+            // Clear invite token from URL
+            window.history.replaceState({}, '', window.location.pathname);
+          }
+        } catch (error) {
+          console.error('Error handling invite token:', error);
+        }
       }
     };
 
-    fetchOwner();
+    handleInviteToken();
   }, [user]);
 
-  // Use presence hook to track users
-  const { users, onlineCount, isOwner, wasKicked, kickUser, setUserOfflineBeforeSignout } = usePresence(ownerId);
+  // Get canvas metadata when canvas is selected
+  useEffect(() => {
+    if (!user || !currentCanvasId) return;
+
+    const fetchCanvasMetadata = async () => {
+      try {
+        const metadata = await getCanvasMetadata(currentCanvasId);
+        if (metadata) {
+          setCanvasMetadata(metadata);
+          setOwnerId(metadata.ownerId);
+        }
+      } catch (error) {
+        console.error('Error fetching canvas metadata:', error);
+      }
+    };
+
+    fetchCanvasMetadata();
+  }, [user, currentCanvasId]);
+
+  // Use presence hook to track users (only when on canvas page)
+  const { users, onlineCount, isOwner, wasKicked, kickUser, setUserOfflineBeforeSignout } = usePresence(
+    currentPage === 'canvas' ? ownerId : null
+  );
   
   // Use cursors hook to get removeCursor function for cleanup
   // Memoize onlineUserIds to prevent infinite loop in useCursors dependency array
@@ -40,6 +88,42 @@ function App() {
   const handleBeforeSignOut = async () => {
     await setUserOfflineBeforeSignout(); // Set presence offline
     await removeCursor(); // Remove cursor
+  };
+
+  // Handle canvas selection from Files page
+  const handleSelectCanvas = async (canvasId) => {
+    try {
+      // Check permissions
+      const hasPermission = await checkCanvasPermission(canvasId, user.uid, user.email);
+      
+      if (!hasPermission) {
+        setPermissionDenied(true);
+        return;
+      }
+
+      setCurrentCanvasId(canvasId);
+      setCurrentPage('canvas');
+      setPermissionDenied(false);
+    } catch (error) {
+      console.error('Error selecting canvas:', error);
+      setPermissionDenied(true);
+    }
+  };
+
+  // Handle navigation to Files page
+  const handleGoToFiles = () => {
+    setCurrentPage('files');
+    setCurrentCanvasId(null);
+    setPermissionDenied(false);
+  };
+
+  // Handle navigation to Canvas page (from nav menu)
+  const handleGoToCanvas = () => {
+    if (currentPage === 'canvas') return; // Already on canvas
+    
+    if (currentCanvasId) {
+      setCurrentPage('canvas');
+    }
   };
 
   // Handle canvas download
@@ -71,21 +155,44 @@ function App() {
     );
   }
 
+  // Show permission denied banner
+  if (permissionDenied) {
+    return (
+      <Auth 
+        onBeforeSignOut={handleBeforeSignOut}
+        onDownloadCanvas={handleDownloadCanvas}
+        currentPage={currentPage}
+        onNavigateToFiles={handleGoToFiles}
+        onNavigateToCanvas={handleGoToCanvas}
+      >
+        <PermissionDeniedBanner onGoToFiles={handleGoToFiles} />
+      </Auth>
+    );
+  }
+
   return (
     <Auth 
       onBeforeSignOut={handleBeforeSignOut}
       onDownloadCanvas={handleDownloadCanvas}
-      usersButton={user && (
+      currentPage={currentPage}
+      onNavigateToFiles={handleGoToFiles}
+      onNavigateToCanvas={handleGoToCanvas}
+      usersButton={user && currentPage === 'canvas' && (
         <UserList 
           users={users} 
           onlineCount={onlineCount} 
           currentUserId={user.uid}
           isOwner={isOwner}
           onKickUser={kickUser}
+          inviteToken={canvasMetadata?.inviteToken}
         />
       )}
     >
-      <Canvas />
+      {currentPage === 'files' ? (
+        <FilesPage user={user} onSelectCanvas={handleSelectCanvas} />
+      ) : (
+        <Canvas canvasId={currentCanvasId} />
+      )}
     </Auth>
   );
 }

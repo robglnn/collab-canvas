@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { subscribeToShapes, subscribeToCanvasMetadata } from '../lib/firestoreService';
+import { subscribeToShapes, subscribeToCanvasMetadata, subscribeToCanvasShapes } from '../lib/firestoreService';
 
 /**
  * Custom hook for Firestore real-time listeners
  * Subscribes to shapes collection and canvas metadata
  * Detects connection state for offline/online handling
  * 
+ * @param {string} canvasId - Optional canvas ID for multi-canvas support
  * @returns {Object} Firestore state
  * @returns {Array} shapes - Array of shape objects from Firestore
  * @returns {Object|null} canvasMetadata - Canvas metadata (ownerId, createdAt)
@@ -14,7 +15,7 @@ import { subscribeToShapes, subscribeToCanvasMetadata } from '../lib/firestoreSe
  * @returns {boolean} showDisconnectBanner - Whether to show disconnect banner (after 3s)
  * @returns {string|null} error - Error message if subscription fails
  */
-export function useFirestore() {
+export function useFirestore(canvasId) {
   const [shapes, setShapes] = useState([]);
   const [canvasMetadata, setCanvasMetadata] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -23,21 +24,34 @@ export function useFirestore() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    console.log('Setting up Firestore subscriptions...');
-
-    // Subscribe to shapes collection
-    const unsubscribeShapes = subscribeToShapes((updatedShapes) => {
-      setShapes(updatedShapes);
+    if (!canvasId) {
       setLoading(false);
-      setIsConnected(true); // Receiving data means connected
-      setShowDisconnectBanner(false);
-      console.log('Shapes updated from Firestore:', updatedShapes.length);
-    });
+      return;
+    }
+
+    console.log('Setting up Firestore subscriptions for canvas:', canvasId);
+
+    // Subscribe to shapes collection (use canvas-specific if canvasId provided)
+    const unsubscribeShapes = canvasId 
+      ? subscribeToCanvasShapes(canvasId, (updatedShapes) => {
+          setShapes(updatedShapes);
+          setLoading(false);
+          setIsConnected(true);
+          setShowDisconnectBanner(false);
+          console.log('Shapes updated from Firestore:', updatedShapes.length);
+        })
+      : subscribeToShapes((updatedShapes) => {
+          setShapes(updatedShapes);
+          setLoading(false);
+          setIsConnected(true);
+          setShowDisconnectBanner(false);
+          console.log('Shapes updated from Firestore:', updatedShapes.length);
+        });
 
     // Subscribe to canvas metadata
     const unsubscribeMetadata = subscribeToCanvasMetadata((metadata) => {
       setCanvasMetadata(metadata);
-      setIsConnected(true); // Receiving data means connected
+      setIsConnected(true);
       console.log('Canvas metadata updated:', metadata);
     });
 
@@ -47,7 +61,7 @@ export function useFirestore() {
       unsubscribeShapes();
       unsubscribeMetadata();
     };
-  }, []);
+  }, [canvasId]);
 
   // Listen to browser online/offline events
   useEffect(() => {

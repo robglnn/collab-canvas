@@ -47,7 +47,7 @@
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  width: 180px;
+  width: 220px;
   max-height: 400px;
   background: white;
   border-radius: 12px;
@@ -80,15 +80,48 @@
   font-weight: 600;
   font-size: 13px;
   color: #111827;
+  gap: 8px;
+}
+
+.users-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .users-dropdown-count {
-  font-size: 13px;
+  font-size: 11px;
   color: #6b7280;
   background: #e5e7eb;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.copy-invite-btn {
+  background: #667eea;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 24px;
+}
+
+.copy-invite-btn:hover {
+  background-color: #5568d3;
+  transform: scale(1.05);
+}
+
+.copy-invite-btn:active {
+  transform: scale(0.95);
 }
 
 .users-dropdown-items {

@@ -7,7 +7,15 @@ import './Auth.css';
  * Displays sign-in page when user is not authenticated
  * Shows user info and sign-out button when authenticated
  */
-export default function Auth({ children, usersButton, onBeforeSignOut, onDownloadCanvas }) {
+export default function Auth({ 
+  children, 
+  usersButton, 
+  onBeforeSignOut, 
+  onDownloadCanvas,
+  currentPage,
+  onNavigateToFiles,
+  onNavigateToCanvas 
+}) {
   const { user, loading, error, signInWithGoogle, signOut } = useAuth();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isDownloadMenuOpen, setIsDownloadMenuOpen] = useState(false);
@@ -177,6 +185,23 @@ export default function Auth({ children, usersButton, onBeforeSignOut, onDownloa
                 </div>
                 
                 <div className="user-dropdown-items">
+                  {/* Navigation buttons */}
+                  {onNavigateToFiles && (
+                    <button 
+                      className={`user-dropdown-item ${currentPage === 'files' ? 'disabled' : ''}`}
+                      onClick={() => {
+                        if (currentPage !== 'files') {
+                          onNavigateToFiles();
+                          setIsUserMenuOpen(false);
+                        }
+                      }}
+                      disabled={currentPage === 'files'}
+                    >
+                      <span className="dropdown-icon">📁</span>
+                      <span>Files</span>
+                    </button>
+                  )}
+                  
                   <button className="user-dropdown-item" onClick={() => setIsUserMenuOpen(false)}>
                     <span className="dropdown-icon">⚙️</span>
                     <span>Settings</span>

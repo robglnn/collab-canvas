@@ -11,9 +11,11 @@ import './UserList.css';
  * @param {string} currentUserId - Current user's ID to highlight them
  * @param {boolean} isOwner - Whether current user is the owner
  * @param {Function} onKickUser - Callback to kick a user
+ * @param {string} inviteToken - Canvas invite token for sharing
  */
-export default function UserList({ users, onlineCount, currentUserId, isOwner, onKickUser }) {
+export default function UserList({ users, onlineCount, currentUserId, isOwner, onKickUser, inviteToken }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const dropdownRef = useRef(null);
 
   // Filter to show only online users
@@ -37,6 +39,16 @@ export default function UserList({ users, onlineCount, currentUserId, isOwner, o
     setIsOpen(!isOpen);
   };
 
+  const handleCopyInviteLink = (e) => {
+    e.stopPropagation();
+    if (!inviteToken) return;
+    
+    const inviteUrl = `${window.location.origin}${window.location.pathname}?invite=${inviteToken}`;
+    navigator.clipboard.writeText(inviteUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <div className="users-online-container" ref={dropdownRef}>
       {/* Users button */}
@@ -53,8 +65,19 @@ export default function UserList({ users, onlineCount, currentUserId, isOwner, o
       {isOpen && (
         <div className="users-dropdown">
           <div className="users-dropdown-header">
-            <span>Online Users</span>
-            <span className="users-dropdown-count">{onlineCount}</span>
+            <div className="users-header-left">
+              <span>Online Users</span>
+              <span className="users-dropdown-count">{onlineCount}</span>
+            </div>
+            {inviteToken && (
+              <button 
+                className="copy-invite-btn"
+                onClick={handleCopyInviteLink}
+                title={copied ? "Copied!" : "Copy invite link"}
+              >
+                {copied ? '✓' : '🔗'}
+              </button>
+            )}
           </div>
 
           <div className="users-dropdown-items">
