@@ -22,25 +22,8 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Check for test mode in URL
-  const isTestMode = typeof window !== 'undefined' && 
-    new URLSearchParams(window.location.search).get('testMode') === 'true';
-
   // Listen to auth state changes
   useEffect(() => {
-    // Test mode bypass
-    if (isTestMode) {
-      console.log('🧪 Test mode enabled - bypassing authentication');
-      setUser({
-        uid: 'test-user-123',
-        email: 'test@example.com',
-        displayName: 'Test User',
-        photoURL: 'https://via.placeholder.com/150',
-      });
-      setLoading(false);
-      return;
-    }
-
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         // User is signed in
@@ -59,7 +42,7 @@ export function useAuth() {
 
     // Cleanup subscription on unmount
     return () => unsubscribe();
-  }, [isTestMode]);
+  }, []);
 
   /**
    * Sign in with Google OAuth popup
