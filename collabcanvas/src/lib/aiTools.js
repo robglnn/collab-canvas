@@ -11,7 +11,7 @@ export const aiTools = [
     type: 'function',
     function: {
       name: 'createShape',
-      description: 'Create one or more shapes on the canvas (rectangle, circle, or text). Use count for multiple shapes.',
+      description: 'Create one or more shapes on the canvas (rectangle, circle, or text). Use count for multiple shapes. Supports colors.',
       parameters: {
         type: 'object',
         properties: {
@@ -44,6 +44,10 @@ export const aiTools = [
           radius: {
             type: 'number',
             description: 'Radius for circle (default: 50)'
+          },
+          color: {
+            type: 'string',
+            description: 'Color for the shape in hex format (e.g., "#ff0000" for red, "#0000ff" for blue, "#00ff00" for green). Common colors: red=#ff0000, blue=#0000ff, green=#00ff00, yellow=#ffff00, orange=#ff8800, purple=#8800ff, pink=#ff00ff, black=#000000, white=#ffffff, gray=#808080'
           },
           text: {
             type: 'string',
@@ -83,7 +87,7 @@ export const aiTools = [
     type: 'function',
     function: {
       name: 'moveShape',
-      description: 'Move one or more shapes to a new position or by a relative amount. Use "selected" to move currently selected shapes, or use selectShapesByProperty first.',
+      description: 'Move one or more shapes to a new position or by a relative amount. Use "selected" to move currently selected shapes, or use selectShapesByProperty first. To move to center, use viewport.centerX and viewport.centerY from context.',
       parameters: {
         type: 'object',
         properties: {
@@ -94,11 +98,11 @@ export const aiTools = [
           },
           x: {
             type: 'number',
-            description: 'Absolute X position, or leave undefined for relative move'
+            description: 'Absolute X position. Use viewport.centerX from context to move to center horizontally.'
           },
           y: {
             type: 'number',
-            description: 'Absolute Y position, or leave undefined for relative move'
+            description: 'Absolute Y position. Use viewport.centerY from context to move to center vertically.'
           },
           deltaX: {
             type: 'number',
@@ -153,7 +157,7 @@ export const aiTools = [
     type: 'function',
     function: {
       name: 'rotateShape',
-      description: 'Rotate one or more shapes (rectangles and circles only, not text)',
+      description: 'Rotate one or more shapes (rectangles, circles, and text). Set rotation angle in degrees.',
       parameters: {
         type: 'object',
         properties: {
@@ -222,12 +226,35 @@ export const aiTools = [
     }
   },
 
+  {
+    type: 'function',
+    function: {
+      name: 'updateColor',
+      description: 'Update the color/fill of one or more shapes',
+      parameters: {
+        type: 'object',
+        properties: {
+          shapeIds: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Array of shape IDs to update. Use ["selected"] for currently selected shapes.'
+          },
+          color: {
+            type: 'string',
+            description: 'New color in hex format (e.g., "#ff0000" for red, "#0000ff" for blue). Common: red=#ff0000, blue=#0000ff, green=#00ff00, yellow=#ffff00, orange=#ff8800, purple=#8800ff, pink=#ff00ff, black=#000000, white=#ffffff'
+          }
+        },
+        required: ['shapeIds', 'color']
+      }
+    }
+  },
+
   // ====== SELECTION ======
   {
     type: 'function',
     function: {
       name: 'selectShapesByProperty',
-      description: 'Select shapes based on their properties (type, position, size, etc.). Returns shape IDs.',
+      description: 'Select shapes based on their properties (type, position, size, color, etc.). Returns shape IDs. Useful for selecting shapes to manipulate.',
       parameters: {
         type: 'object',
         properties: {
@@ -235,6 +262,10 @@ export const aiTools = [
             type: 'string',
             enum: ['rectangle', 'circle', 'text', 'all'],
             description: 'Filter by shape type. Use "all" for all types.'
+          },
+          color: {
+            type: 'string',
+            description: 'Filter by color in hex format (e.g., "#ff0000" for red, "#0000ff" for blue). Use to find "the red circle" or "blue rectangles".'
           },
           limit: {
             type: 'number',

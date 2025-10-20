@@ -205,13 +205,13 @@ const Shape = memo(function Shape({
         rotation: rotation,
       });
     } else if (shape.type === 'text') {
-      // For text, only update width (height is automatic based on text content)
+      // For text, update width and rotation
       onChange({
         ...shape,
         x: node.x(),
         y: node.y(),
         width: Math.max(20, node.width() * scaleX),
-        rotation: 0, // Don't allow rotation for text in basic version
+        rotation: rotation,
       });
     } else if (shape.type === 'line') {
       // For lines, apply scale to points array to stretch/shrink the line
@@ -372,7 +372,7 @@ const Shape = memo(function Shape({
               : ['top-left', 'top-center', 'top-right', 'middle-left', 'middle-right', 'bottom-left', 'bottom-center', 'bottom-right']
           }
           keepRatio={shape.type === 'circle'} // Keep circular shape for circles
-          rotateEnabled={shape.type !== 'text' && shape.type !== 'line'} // Disable rotation for text and lines
+          rotateEnabled={shape.type !== 'line'} // Disable rotation for lines only
           rotationSnaps={[0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240, 255, 270, 285, 300, 315, 330, 345]} // 15° snapping when Shift is held
           anchorSize={8} // Larger anchors for easier grabbing
           anchorStroke="#667eea" // Match selection color

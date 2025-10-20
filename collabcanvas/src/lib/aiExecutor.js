@@ -36,6 +36,9 @@ export async function executeFunction(functionName, args, context) {
       case 'updateText':
         return await updateText(args, context);
       
+      case 'updateColor':
+        return await updateColor(args, context);
+      
       case 'selectShapesByProperty':
         return await selectShapesByProperty(args, context);
       
@@ -185,7 +188,7 @@ function resolveShapeIds(shapeIds, context) {
 // ====== SHAPE CREATION ======
 
 async function createShape(args, context) {
-  const { shapeType, count = 1, x, y, width, height, radius, text, fontSize, arrangement, spacing = 20, gridRows, gridCols } = args;
+  const { shapeType, count = 1, x, y, width, height, radius, text, fontSize, color, arrangement, spacing = 20, gridRows, gridCols } = args;
   const { addShape, viewport, user } = context;
 
   // Default positions to viewport center if not specified
@@ -244,14 +247,17 @@ async function createShape(args, context) {
     if (shapeType === 'rectangle') {
       newShape.width = width || 100;
       newShape.height = height || 100;
+      newShape.fill = color || '#000000';
     } else if (shapeType === 'circle') {
       newShape.radius = radius || 50;
+      newShape.fill = color || '#000000';
     } else if (shapeType === 'text') {
       newShape.text = text || 'Text';
       newShape.fontSize = fontSize || 24;
       newShape.width = width || 200;
       newShape.fontFamily = 'Arial';
       newShape.align = 'left';
+      newShape.fill = color || '#000000';
     }
 
     // Validate and sanitize shape properties
@@ -261,9 +267,10 @@ async function createShape(args, context) {
     createdShapes.push(newShape);
   }
 
+  const colorText = color ? ` (${color})` : '';
   const message = count === 1 
-    ? `Created ${shapeType} at (${Math.round(defaultX)}, ${Math.round(defaultY)})`
-    : `Created ${count} ${shapeType}${count > 1 ? 's' : ''} in ${arrangement || 'horizontal'} arrangement`;
+    ? `Created ${shapeType}${colorText} at (${Math.round(defaultX)}, ${Math.round(defaultY)})`
+    : `Created ${count} ${shapeType}${count > 1 ? 's' : ''}${colorText} in ${arrangement || 'horizontal'} arrangement`;
 
   return {
     success: true,
@@ -280,7 +287,7 @@ async function createShape(args, context) {
 
 async function moveShape(args, context) {
   const { shapeIds, x, y, deltaX, deltaY } = args;
-  const { shapes, updateShape, user } = context;
+  const { shapes, updateShape, user, viewport } = context;
 
   // Resolve special keywords like "selected"
   const resolvedIds = resolveShapeIds(shapeIds, context);
@@ -295,6 +302,10 @@ async function moveShape(args, context) {
 
   const results = [];
   const errors = [];
+
+  // Calculate center position if needed
+  const centerX = viewport?.centerX || 2500;
+  const centerY = viewport?.centerY || 2500;
 
   for (const shapeId of resolvedIds) {
     const shape = shapes.find(s => s.id === shapeId);
@@ -312,9 +323,13 @@ async function moveShape(args, context) {
     let newX = shape.x;
     let newY = shape.y;
 
-    // Absolute positioning
-    if (x !== undefined) newX = x;
-    if (y !== undefined) newY = y;
+    // Absolute positioning (supports "center" as special value)
+    if (x !== undefined) {
+      newX = x === 'center' ? centerX : x;
+    }
+    if (y !== undefined) {
+      newY = y === 'center' ? centerY : y;
+    }
 
     // Relative positioning
     if (deltaX !== undefined) newX += deltaX;
@@ -429,11 +444,6 @@ async function rotateShape(args, context) {
     
     if (!shape) {
       errors.push(`Shape ${shapeId} not found`);
-      continue;
-    }
-
-    if (shape.type === 'text') {
-      errors.push(`Cannot rotate text shapes`);
       continue;
     }
 
@@ -573,10 +583,59 @@ async function updateText(args, context) {
   };
 }
 
+async function updateColor(args, context) {
+  const { shapeIds, color } = args;
+  const { shapes, updateShape, user } = context;
+
+  const resolvedIds = resolveShapeIds(shapeIds, context);
+
+  if (resolvedIds.length === 0) {
+    return {
+      success: false,
+      message: 'No shapes found to update color',
+      errors: ['No valid shape IDs provided or no shapes selected']
+    };
+  }
+
+  const results = [];
+  const errors = [];
+
+  for (const shapeId of resolvedIds) {
+    const shape = shapes.find(s => s.id === shapeId);
+    
+    if (!shape) {
+      errors.push(`Shape ${shapeId} not found`);
+      continue;
+    }
+
+    if (!canModifyShape(shape, user)) {
+      errors.push(`Shape ${shapeId} is locked by another user`);
+      continue;
+    }
+
+    const updates = { 
+      ...shape, 
+      fill: color,
+      updatedByAI: true, 
+      updatedBy: user?.uid 
+    };
+
+    await updateShape(shapeId, updates);
+    results.push(shapeId);
+  }
+
+  return {
+    success: results.length > 0,
+    message: `Updated color of ${results.length} shape(s) to ${color}${errors.length > 0 ? ` (${errors.length} failed)` : ''}`,
+    data: { updatedShapeIds: results },
+    errors: errors.length > 0 ? errors : undefined
+  };
+}
+
 // ====== SELECTION ======
 
 async function selectShapesByProperty(args, context) {
-  const { shapeType, limit, sortBy, sortOrder, minX, maxX, minY, maxY } = args;
+  const { shapeType, color, limit, sortBy, sortOrder, minX, maxX, minY, maxY } = args;
   const { shapes, selectShape } = context;
 
   let filteredShapes = [...shapes];
@@ -584,6 +643,15 @@ async function selectShapesByProperty(args, context) {
   // Filter by type
   if (shapeType && shapeType !== 'all') {
     filteredShapes = filteredShapes.filter(s => s.type === shapeType);
+  }
+
+  // Filter by color
+  if (color !== undefined) {
+    filteredShapes = filteredShapes.filter(s => {
+      const shapeColor = (s.fill || '#000000').toLowerCase();
+      const targetColor = color.toLowerCase();
+      return shapeColor === targetColor;
+    });
   }
 
   // Filter by position
@@ -622,9 +690,10 @@ async function selectShapesByProperty(args, context) {
     selectShape(shapeIds);
   }
 
+  const colorText = color ? ` with color ${color}` : '';
   return {
     success: true,
-    message: `Selected ${shapeIds.length} shape(s)`,
+    message: `Selected ${shapeIds.length} shape(s)${colorText}`,
     data: { selectedShapeIds: shapeIds, shapes: filteredShapes }
   };
 }

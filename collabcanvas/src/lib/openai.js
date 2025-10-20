@@ -28,19 +28,27 @@ export async function callOpenAI(userMessage, tools, context) {
 
 Context: ${context.shapes?.length || 0} shapes, ${context.selectedShapeIds?.length || 0} selected, viewport at (${Math.round(context.viewport?.centerX || 0)}, ${Math.round(context.viewport?.centerY || 0)})
 
-Shape types: rectangle, circle, text | Canvas: 5000x5000px
+Shape types: rectangle, circle, text | Canvas: 5000x5000px | Supports colors
+
+COLORS: All shapes support fill colors. Common colors:
+- red=#ff0000, blue=#0000ff, green=#00ff00, yellow=#ffff00
+- orange=#ff8800, purple=#8800ff, pink=#ff00ff
+- black=#000000, white=#ffffff, gray=#808080
 
 RULES:
 1. Multiple shapes: use count + arrangement in createShape
-2. Manipulate by type: selectShapesByProperty first, then use ["selected"]
+2. Manipulate by type/color: selectShapesByProperty first, then use ["selected"]
 3. For selected shapes: use shapeIds: ["selected"]
-4. Undo/redo: respond "Use Ctrl+Z to undo or Ctrl+Shift+Z to redo"
-5. Off-topic: respond "I can only help with canvas operations"
-6. Always use functions when applicable
+4. Center positioning: use viewport.centerX and viewport.centerY
+5. Undo/redo: respond "Use Ctrl+Z to undo or Ctrl+Shift+Z to redo"
+6. Off-topic: respond "I can only help with canvas operations"
+7. Always use functions when applicable
 
 PATTERNS:
-Simple: "create 5 squares in a row" → createShape(type:"rectangle", count:5, arrangement:"horizontal")
+Simple: "create 5 red squares" → createShape(type:"rectangle", count:5, color:"#ff0000", arrangement:"horizontal")
+Color: "move blue circle to center" → selectShapesByProperty(type:"circle", color:"#0000ff") then moveShape(shapeIds:["selected"], x:viewport.centerX, y:viewport.centerY)
 UI: "create a login form" → createUITemplate(type:"loginForm")
+Grid: "create 3x3 grid of circles" → createShape(type:"circle", count:9, arrangement:"grid", gridRows:3, gridCols:3)
 Templates: loginForm, navBar, card, button, dashboard, sidebar (customize with menuItems, buttonText, cardCount, etc)`;
 
     const response = await openai.chat.completions.create({
