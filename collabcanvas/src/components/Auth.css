@@ -185,7 +185,7 @@
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  width: 200px;
+  width: 180px;
   background: white;
   border-radius: 12px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);

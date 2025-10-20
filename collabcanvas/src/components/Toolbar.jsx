@@ -430,7 +430,6 @@ export default function Toolbar({ onCreateShape, selectedShapes = [], onUpdateLi
             >
               <option value="Arial">Arial</option>
               <option value="Times New Roman">Times New Roman</option>
-              <option value="Papyrus">Papyrus</option>
             </select>
           </label>
 
